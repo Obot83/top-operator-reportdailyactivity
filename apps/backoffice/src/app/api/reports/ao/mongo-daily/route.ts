@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getMongoDb } from '@/lib/mongodb';
 import fs from 'fs';
 import path from 'path';
 
@@ -83,37 +84,120 @@ export type DailySummary = {
   by_ao: BarItem[];
 };
 
-// ─── Module-level cache (loaded once per server process) ──────────────────────
+// ─── Data loader (MongoDB live with fallback to local files) ──────────────────
 
 let cachedLeads: any[] | null = null;
 let cachedGroups: any[] | null = null;
-let aoNameCache: Map<string, string> | null = null;
 
-function loadData() {
-  if (!cachedLeads) {
-    console.log('[mongo-daily] loading leads…');
-    cachedLeads = JSON.parse(
-      fs.readFileSync(path.join(MONGODB_DIR, 'kospinus001.leads.json'), 'utf8'),
-    );
-  }
-  if (!cachedGroups) {
-    console.log('[mongo-daily] loading groups…');
-    cachedGroups = JSON.parse(
-      fs.readFileSync(path.join(MONGODB_DIR, 'kospinus001.leads_group.json'), 'utf8'),
-    );
-  }
-  if (!aoNameCache) {
-    aoNameCache = new Map<string, string>();
-    for (const g of cachedGroups!) {
-      const id: string = g.sales?.id;
-      const name: string = (g.sales?.name ?? '').trim();
-      if (id && name) aoNameCache.set(id, name);
+async function loadData(dateStr?: string, aoId?: string): Promise<{ leads: any[]; groups: any[]; aoNames: Map<string, string> }> {
+  try {
+    const db = await getMongoDb();
+    const leadMatch: any = {};
+    const groupMatch: any = {};
+
+    if (dateStr) {
+      const start = new Date(`${dateStr}T00:00:00+07:00`);
+      const end = new Date(`${dateStr}T23:59:59.999+07:00`);
+      const dateQuery = {
+        $or: [
+          { create_dtm: { $gte: start, $lte: end } },
+          { create_dtm: { $regex: `^${dateStr}` } },
+        ],
+      };
+      Object.assign(leadMatch, dateQuery);
+      Object.assign(groupMatch, dateQuery);
     }
+
+    if (aoId) {
+      leadMatch.create_user = aoId;
+      groupMatch['sales.id'] = aoId;
+    }
+
+    const projection = {
+      create_dtm: 1,
+      create_user: 1,
+      status: 1,
+      flg: 1,
+      pemohon: 1,
+      pengajuan: 1,
+      keterangan: 1,
+      survey_dtm: 1,
+      client: 1,
+      reff: 1,
+    };
+
+    const [leads, groups, groupSales] = await Promise.all([
+      db.collection('leads')
+        .find(leadMatch, { projection })
+        .sort({ create_dtm: -1 })
+        .limit(dateStr ? 2000 : 500)
+        .toArray(),
+      db.collection('leads_group')
+        .find(groupMatch)
+        .sort({ create_dtm: -1 })
+        .limit(dateStr ? 1000 : 300)
+        .toArray(),
+      db.collection('leads_group')
+        .find({}, { projection: { 'sales.id': 1, 'sales.name': 1 } })
+        .toArray(),
+    ]);
+
+    const aoNames = new Map<string, string>();
+    for (const g of groupSales) {
+      const id = (g as any).sales?.id;
+      const name = ((g as any).sales?.name ?? '').trim();
+      if (id && name) aoNames.set(id, name);
+    }
+
+    return { leads, groups, aoNames };
+  } catch (err) {
+    console.warn('[mongo-daily] live DB failed, fallback to local files:', err);
+    const MONGODB_DIR = path.resolve('d:/Project/top-operator/mongodb');
+    if (fs.existsSync(path.join(MONGODB_DIR, 'kospinus001.leads.json'))) {
+      if (!cachedLeads) {
+        cachedLeads = JSON.parse(
+          fs.readFileSync(path.join(MONGODB_DIR, 'kospinus001.leads.json'), 'utf8'),
+        );
+      }
+      if (!cachedGroups) {
+        cachedGroups = JSON.parse(
+          fs.readFileSync(path.join(MONGODB_DIR, 'kospinus001.leads_group.json'), 'utf8'),
+        );
+      }
+      const aoNames = new Map<string, string>();
+      for (const g of cachedGroups!) {
+        const id: string = g.sales?.id;
+        const name: string = (g.sales?.name ?? '').trim();
+        if (id && name) aoNames.set(id, name);
+      }
+      return { leads: cachedLeads!, groups: cachedGroups!, aoNames };
+    }
+    throw err;
   }
-  return { leads: cachedLeads!, groups: cachedGroups! };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function extractDate(val: any): string {
+  if (!val) return '';
+  if (val instanceof Date) return val.toISOString();
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object' && val.$date) {
+    return typeof val.$date === 'string' ? val.$date : new Date(val.$date).toISOString();
+  }
+  return '';
+}
+
+function extractNumber(val: any): number {
+  if (val == null) return 0;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') return parseFloat(val) || 0;
+  if (typeof val === 'object') {
+    if (val.$numberDecimal) return parseFloat(val.$numberDecimal) || 0;
+    if (typeof val.toString === 'function') return parseFloat(val.toString()) || 0;
+  }
+  return 0;
+}
 
 function toLocalDate(isoStr: string): string {
   const d = new Date(isoStr);
@@ -389,13 +473,13 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(pageStr, 10));
     const limit = Math.max(5, parseInt(limitStr, 10));
 
-    const { leads, groups } = loadData();
+    const { leads, groups, aoNames } = await loadData(dateStr, aoId);
 
     const activities: ActivityItem[] = [];
 
     // ── Process leads ──────────────────────────────────────────────────────
     for (const l of leads) {
-      const waktu: string = l.create_dtm?.$date ?? '';
+      const waktu: string = extractDate(l.create_dtm);
       if (!waktu) continue;
 
       if (dateStr && toLocalDate(waktu) !== dateStr) continue;
@@ -433,10 +517,10 @@ export async function GET(req: NextRequest) {
       if (appTypeFilter !== 'all' && application_type.type !== appTypeFilter) continue;
 
       const debitur: string = l.pemohon?.name ?? '-';
-      const ao_name: string = aoNameCache?.get(ao_id) ?? ao_id;
-      const nominal = parseFloat(l.pengajuan?.submission?.loan?.$numberDecimal ?? '0');
+      const ao_name: string = aoNames.get(ao_id) ?? ao_id;
+      const nominal = extractNumber(l.pengajuan?.submission?.loan);
       const hasil_aktivitas: string = l.keterangan?.sales ?? '';
-      const follow_up: string | null = l.survey_dtm?.$date ?? null;
+      const follow_up: string | null = extractDate(l.survey_dtm) || null;
 
       const raw_status: RawMongoStatus = {
         lead: l.status?.lead ?? null,
@@ -452,7 +536,7 @@ export async function GET(req: NextRequest) {
       }
 
       activities.push({
-        id: l._id,
+        id: String(l._id),
         ao_id,
         ao_name,
         branch: l.client?.branch_name ?? '',
@@ -460,7 +544,7 @@ export async function GET(req: NextRequest) {
         debitur,
         kategori,
         jenis_aktivitas,
-        referensi: l._id,
+        referensi: String(l._id),
         hasil_aktivitas,
         status,
         flow_stage,
@@ -475,7 +559,7 @@ export async function GET(req: NextRequest) {
 
     // ── Process groups ─────────────────────────────────────────────────────
     for (const g of groups) {
-      const waktu: string = g.create_dtm?.$date ?? '';
+      const waktu: string = extractDate(g.create_dtm);
       if (!waktu) continue;
 
       if (dateStr && toLocalDate(waktu) !== dateStr) continue;
@@ -541,7 +625,7 @@ export async function GET(req: NextRequest) {
       }
 
       activities.push({
-        id: g._id,
+        id: String(g._id),
         ao_id,
         ao_name,
         branch: g.sales?.branch_name ?? '',
@@ -549,7 +633,7 @@ export async function GET(req: NextRequest) {
         debitur,
         kategori,
         jenis_aktivitas,
-        referensi: g._id,
+        referensi: String(g._id),
         hasil_aktivitas: g.notes ?? '',
         status,
         flow_stage,
