@@ -22,6 +22,11 @@ export type CollectionPaymentRecord = {
   tenor: number;
   bucket: string;
   statusBayar: 'SUDAH_BAYAR' | 'PARTIAL' | 'JANJI_BAYAR';
+  // GPS & Lokasi Rumah Debitur
+  latitude?: number | null;
+  longitude?: number | null;
+  alamat_rumah?: string | null;
+  maps_url?: string | null;
 };
 
 export type CollectionSettlementRecord = {
@@ -300,6 +305,86 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
       const totalPages = Math.ceil(totalRecords / limit) || 1;
       const paginatedPayments = filteredPayments.slice((page - 1) * limit, page * limit);
 
+      // Enrich paginated payments with GPS location and home address from MongoDB (contract, leads_surveyor, leads)
+      let enrichedPayments = paginatedPayments;
+      try {
+        const contractIds = paginatedPayments.map((p) => p.contract_id).filter(Boolean);
+        if (contractIds.length > 0) {
+          const contracts = await db
+            .collection<any>('contract')
+            .find({ _id: { $in: contractIds } })
+            .toArray();
+          const contractMap = new Map(contracts.map((c: any) => [String(c._id), c]));
+
+          const leadIds = contracts.map((c: any) => c.lead_id).filter(Boolean);
+          const [surveyorLeads, regularLeads] = await Promise.all([
+            leadIds.length > 0
+              ? db
+                  .collection<any>('leads_surveyor')
+                  .find({ _id: { $in: leadIds } })
+                  .toArray()
+              : [],
+            leadIds.length > 0
+              ? db
+                  .collection<any>('leads')
+                  .find({ _id: { $in: leadIds } })
+                  .toArray()
+              : [],
+          ]);
+
+          const lsMap = new Map(surveyorLeads.map((l: any) => [String(l._id), l]));
+          const lMap = new Map(regularLeads.map((l: any) => [String(l._id), l]));
+
+          enrichedPayments = paginatedPayments.map((p) => {
+            const contract = contractMap.get(p.contract_id);
+            const leadId = contract?.lead_id ? String(contract.lead_id) : null;
+            const ls = leadId ? lsMap.get(leadId) : null;
+            const l = leadId ? lMap.get(leadId) : null;
+
+            const rawLat =
+              ls?.pemohon?.domisili?.latitude ??
+              l?.pemohon?.domisili?.latitude ??
+              contract?.alamat?.latitude ??
+              null;
+            const rawLng =
+              ls?.pemohon?.domisili?.longitude ??
+              l?.pemohon?.domisili?.longitude ??
+              contract?.alamat?.longitude ??
+              null;
+
+            const alamatRumah =
+              contract?.alamat?.alamat ||
+              ls?.pemohon?.domisili?.address ||
+              l?.pemohon?.domisili?.address ||
+              (contract?.alamat
+                ? [contract.alamat.kelurahan, contract.alamat.kecamatan, contract.alamat.kota]
+                    .filter(Boolean)
+                    .join(', ')
+                : null);
+
+            const latitude = rawLat != null && !isNaN(Number(rawLat)) ? Number(rawLat) : null;
+            const longitude = rawLng != null && !isNaN(Number(rawLng)) ? Number(rawLng) : null;
+
+            const maps_url =
+              latitude != null && longitude != null
+                ? `https://www.google.com/maps?q=${latitude},${longitude}`
+                : alamatRumah
+                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(alamatRumah)}`
+                : null;
+
+            return {
+              ...p,
+              alamat_rumah: alamatRumah,
+              latitude,
+              longitude,
+              maps_url,
+            };
+          });
+        }
+      } catch (enrichErr) {
+        console.error('Error enriching payments with GPS:', enrichErr);
+      }
+
       // Compatibility: Collector Summaries
       const collectorSummaryMap = new Map<string, any>();
       for (const p of filteredPayments) {
@@ -358,7 +443,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
             by_collector,
             by_branch,
           },
-          payments: paginatedPayments,
+          payments: enrichedPayments,
           settlements,
           collectors: collectorsList,
           branches: Array.from(branchesSet).sort(),

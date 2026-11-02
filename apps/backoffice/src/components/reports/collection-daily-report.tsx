@@ -20,6 +20,9 @@ import {
   ChevronRight,
   TrendingUp,
   UserCheck,
+  MapPin,
+  ExternalLink,
+  Navigation,
 } from 'lucide-react';
 import { formatRupiah } from '@/lib/formatters';
 import type { DailyCollectionData, CollectionPaymentRecord } from '@/app/api/reports/collection/daily/route';
@@ -94,6 +97,10 @@ export function CollectionDailyReport() {
       'No. Kontrak',
       'Debitur',
       'No. HP',
+      'Alamat Rumah',
+      'Latitude',
+      'Longitude',
+      'Link Google Maps',
       'Kolektor',
       'Cabang',
       'Waktu Bayar',
@@ -108,6 +115,10 @@ export function CollectionDailyReport() {
       `"${p.contract_id}"`,
       `"${p.debitur}"`,
       `"${p.no_hp}"`,
+      `"${(p.alamat_rumah ?? '').replace(/"/g, '""')}"`,
+      p.latitude != null ? p.latitude : '',
+      p.longitude != null ? p.longitude : '',
+      `"${p.maps_url ?? ''}"`,
       `"${p.collector_name}"`,
       `"${p.branch_name}"`,
       `"${p.tgl_bayar}"`,
@@ -503,6 +514,7 @@ export function CollectionDailyReport() {
                   <tr>
                     <th className="px-4 py-3">No. Kontrak</th>
                     <th className="px-4 py-3">Debitur</th>
+                    <th className="px-4 py-3 min-w-[200px]">Lokasi Rumah (GPS)</th>
                     <th className="px-4 py-3">Kolektor</th>
                     <th className="px-4 py-3">Cabang</th>
                     <th className="px-4 py-3">Tenor</th>
@@ -528,6 +540,43 @@ export function CollectionDailyReport() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{p.debitur}</p>
                         <p className="text-xs text-muted-foreground font-mono">{p.no_hp}</p>
+                      </td>
+                      <td className="px-4 py-3 max-w-[260px]">
+                        <div className="flex flex-col gap-1">
+                          {p.alamat_rumah ? (
+                            <p className="text-xs text-foreground line-clamp-2 leading-tight" title={p.alamat_rumah}>
+                              {p.alamat_rumah}
+                            </p>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Alamat belum terdaftar</span>
+                          )}
+
+                          {p.latitude != null && p.longitude != null ? (
+                            <a
+                              href={p.maps_url ?? `https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 rounded px-1.5 py-0.5 w-fit transition-colors group"
+                              title="Buka titik koordinat GPS di Google Maps"
+                            >
+                              <MapPin className="h-3 w-3 text-emerald-600 flex-shrink-0" />
+                              <span className="truncate">{p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}</span>
+                              <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100 flex-shrink-0" />
+                            </a>
+                          ) : p.alamat_rumah ? (
+                            <a
+                              href={p.maps_url ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.alamat_rumah)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted border border-border rounded px-1.5 py-0.5 w-fit transition-colors group"
+                              title="Cari alamat di Google Maps"
+                            >
+                              <Navigation className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <span>Cari di Peta</span>
+                              <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100 flex-shrink-0" />
+                            </a>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-medium text-foreground">{p.collector_name}</span>
