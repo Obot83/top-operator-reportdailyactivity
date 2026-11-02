@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   Wallet,
@@ -514,8 +515,15 @@ export function CollectionDailyReport() {
                 <tbody className="divide-y divide-border">
                   {payments.map((p) => (
                     <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-mono font-medium text-xs text-primary">
-                        {p.contract_id}
+                      <td className="px-4 py-3 font-mono font-medium text-xs">
+                        <Link
+                          href={`/dashboard/debitur/${encodeURIComponent(p.contract_id)}`}
+                          className="text-primary hover:underline font-semibold flex items-center gap-1 group"
+                          title="Buka Debitur Card Controller"
+                        >
+                          {p.contract_id}
+                          <span className="opacity-0 group-hover:opacity-100 text-[10px] transition-opacity">↗</span>
+                        </Link>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{p.debitur}</p>
