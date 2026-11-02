@@ -1,0 +1,326 @@
+// top-operator/prisma/schema.prisma
+// Database: MySQL 8.0+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ENUMS
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+enum Kolektibilitas {
+  LANCAR
+  DPK
+  KURANG_LANCAR
+  DIRAGUKAN
+  MACET
+}
+
+enum VisitStatus {
+  MET_DEBTOR
+  VACANT
+  REFUSED
+  PARTIAL_MET
+  PHONE_ONLY
+  OTHER
+}
+
+enum PTPStatus {
+  PENDING
+  HONORED
+  BROKEN
+}
+
+enum AOActivityType {
+  PROSPEK
+  SURVEY_AGUNAN
+  VERIFIKASI
+  BOOKING
+  REALISASI
+  POTONGAN_TITIPAN
+}
+
+enum SPLevel {
+  SP1
+  SP2
+  SP3
+}
+
+enum UserRole {
+  ADMIN
+  BRANCH_MANAGER
+  AO
+  COLLECTOR
+}
+
+enum StatusBayar {
+  BELUM_DIKUNJUNGI
+  SUDAH_DIKUNJUNGI
+  JANJI_BAYAR
+  SUDAH_BAYAR
+  TIDAK_BISA_BAYAR
+}
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// MODELS
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Branch {
+  id        String   @id @default(cuid())
+  code      String   @unique @db.VarChar(10)
+  name      String   @db.VarChar(100)
+  alamat    String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users           User[]
+  loanAccounts    LoanAccount[]
+  aoActivities    AOActivity[]
+  suratPeringatan SuratPeringatan[]
+
+  @@map("branches")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  branchId   String
+  name       String   @db.VarChar(100)
+  employeeId String?  @unique @db.VarChar(20)
+  email      String   @unique @db.VarChar(150)
+  password   String   @db.VarChar(255)
+  role       UserRole @default(COLLECTOR)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  branch          Branch            @relation(fields: [branchId], references: [id])
+  aoActivities    AOActivity[]
+  collectionTasks CollectionTask[]
+  visitLogs       DebiturVisitLog[]
+  ptpCreated      PTPTracking[]
+  suratPeringatan SuratPeringatan[]
+
+  @@index([branchId])
+  @@map("users")
+}
+
+model Debitur {
+  id                String   @id @default(cuid())
+  cif               String   @unique @db.VarChar(30)
+  name              String   @db.VarChar(150)
+  nik               String   @unique @db.VarChar(16)
+  phone             String?  @db.VarChar(20)
+  gender            String?  @db.VarChar(10)
+  domisiliAddress   String   @db.Text
+  domisiliKecamatan String?  @db.VarChar(100)
+  domisiliKota      String?  @db.VarChar(100)
+  usahaAddress      String?  @db.Text
+  defaultLatitude   Float?
+  defaultLongitude  Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  loanAccounts LoanAccount[]
+
+  @@index([cif])
+  @@index([nik])
+  @@map("debiturs")
+}
+
+model LoanAccount {
+  id                String         @id @default(cuid())
+  accountNumber     String         @unique @db.VarChar(25)
+  debiturId         String
+  debiturCif        String         @db.VarChar(30)
+  branchId          String
+  productName       String         @default("LancarKu") @db.VarChar(50)
+  plafon            Decimal        @db.Decimal(15, 2)
+  bakiDebetPokok    Decimal        @db.Decimal(15, 2)
+  saldoTitipan      Decimal        @default(0) @db.Decimal(15, 2)
+  bungaPerTahun     Decimal        @default(0) @db.Decimal(5, 2)
+  tenorMinggu       Int
+  angsuranPokok     Decimal        @default(0) @db.Decimal(15, 2)
+  angsuranBunga     Decimal        @default(0) @db.Decimal(15, 2)
+  totalAngsuran     Decimal        @default(0) @db.Decimal(15, 2)
+  tanggalAkad       DateTime       @db.Date
+  tanggalJatuhTempo DateTime?      @db.Date
+  dpd               Int            @default(0)
+  kolektibilitas    Kolektibilitas @default(LANCAR)
+  autodebitEnabled  Boolean        @default(false)
+  isWriteOff        Boolean        @default(false)
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  debitur         Debitur           @relation(fields: [debiturId], references: [id])
+  branch          Branch            @relation(fields: [branchId], references: [id])
+  visitLogs       DebiturVisitLog[]
+  ptpTrackings    PTPTracking[]
+  collectionTasks CollectionTask[]
+  angsuranLedger  AngsuranLedger[]
+  suratPeringatan SuratPeringatan[]
+
+  @@index([debiturId])
+  @@index([debiturCif])
+  @@index([branchId])
+  @@index([dpd, kolektibilitas])
+  @@map("loan_accounts")
+}
+
+model AngsuranLedger {
+  id            String   @id @default(cuid())
+  loanAccountId String
+  tanggalBayar  DateTime @db.Date
+  jumlahBayar   Decimal  @db.Decimal(15, 2)
+  bayarPokok    Decimal  @db.Decimal(15, 2)
+  bayarBunga    Decimal  @db.Decimal(15, 2)
+  bayarDenda    Decimal  @default(0) @db.Decimal(15, 2)
+  sumberBayar   String   @default("TUNAI") @db.VarChar(20)
+  keterangan    String?  @db.VarChar(255)
+  createdAt     DateTime @default(now())
+
+  loanAccount LoanAccount @relation(fields: [loanAccountId], references: [id])
+
+  @@index([loanAccountId, tanggalBayar])
+  @@map("angsuran_ledgers")
+}
+
+model AOActivity {
+  id                      String         @id @default(cuid())
+  aoId                    String
+  branchId                String
+  debiturId               String?
+  accountNumber           String?        @db.VarChar(25)
+  activityType            AOActivityType
+  activityDate            DateTime       @default(now())
+  nominalRealisasi        Decimal?       @db.Decimal(15, 2)
+  nominalTitipanMuka      Decimal?       @db.Decimal(15, 2)
+  prospekName             String?        @db.VarChar(150)
+  prospekNominalPengajuan Decimal?       @db.Decimal(15, 2)
+  status                  String?        @db.VarChar(50)
+  catatan                 String?        @db.Text
+  latitude                Float?
+  longitude               Float?
+  photoUrls               Json           @default("[]")
+  createdAt               DateTime       @default(now())
+
+  ao     User   @relation(fields: [aoId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+
+  @@index([aoId, activityDate])
+  @@index([branchId, activityDate, activityType])
+  @@map("ao_activities")
+}
+
+model CollectionTask {
+  id                 String      @id @default(cuid())
+  loanAccountId      String
+  accountNumber      String      @db.VarChar(25)
+  officerId          String
+  periodeTagih       String      @db.VarChar(10)
+  tanggalTagih       DateTime?   @db.Date
+  tanggalKunjungan   DateTime?
+  tagihanPokok       Decimal     @db.Decimal(15, 2)
+  tagihanBunga       Decimal     @db.Decimal(15, 2)
+  tagihanDenda       Decimal     @default(0) @db.Decimal(15, 2)
+  tagihanTitipan     Decimal     @default(0) @db.Decimal(15, 2)
+  saldoTitipanAwal   Decimal     @default(0) @db.Decimal(15, 2)
+  terealisasiPokok   Decimal     @default(0) @db.Decimal(15, 2)
+  terealisasiBunga   Decimal     @default(0) @db.Decimal(15, 2)
+  terealisasiDenda   Decimal     @default(0) @db.Decimal(15, 2)
+  terealisasiTitipan Decimal     @default(0) @db.Decimal(15, 2)
+  penerimaanWO       Decimal     @default(0) @db.Decimal(15, 2)
+  statusBayar        StatusBayar @default(BELUM_DIKUNJUNGI)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  loanAccount LoanAccount @relation(fields: [loanAccountId], references: [id])
+  officer     User        @relation(fields: [officerId], references: [id])
+
+  @@unique([loanAccountId, periodeTagih])
+  @@index([officerId, periodeTagih])
+  @@index([statusBayar])
+  @@map("collection_tasks")
+}
+
+model DebiturVisitLog {
+  id             String      @id @default(cuid())
+  loanAccountId  String?
+  debiturCif     String      @db.VarChar(30)
+  officerId      String
+  visitTimestamp DateTime    @default(now())
+  latitude       Float?
+  longitude      Float?
+  gpsAccuracy    Float?
+  visitStatus    VisitStatus
+  reasonCategory String?     @db.VarChar(100)
+  reasonDetail   String?     @db.Text
+  fieldNotes     String?     @db.Text
+  photoUrls      Json        @default("[]")
+  hasPTP         Boolean     @default(false)
+  ptpTrackingId  String?
+  createdAt      DateTime    @default(now())
+
+  loanAccount LoanAccount?  @relation(fields: [loanAccountId], references: [id])
+  officer     User          @relation(fields: [officerId], references: [id])
+  ptpTracking PTPTracking?  @relation(fields: [ptpTrackingId], references: [id])
+
+  @@index([loanAccountId, visitTimestamp])
+  @@index([debiturCif, visitTimestamp])
+  @@index([officerId, visitTimestamp])
+  @@map("debitur_visit_logs")
+}
+
+model PTPTracking {
+  id              String    @id @default(cuid())
+  accountNumber   String    @db.VarChar(25)
+  loanAccountId   String
+  officerId       String
+  targetDate      DateTime  @db.Date
+  nominalKomitmen Decimal   @db.Decimal(15, 2)
+  honoredNominal  Decimal?  @db.Decimal(15, 2)
+  honoredDate     DateTime?
+  brokenAt        DateTime?
+  brokenReason    String?   @db.Text
+  status          PTPStatus @default(PENDING)
+  catatan         String?   @db.Text
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  loanAccount LoanAccount       @relation(fields: [loanAccountId], references: [id])
+  officer     User              @relation(fields: [officerId], references: [id])
+  visitLogs   DebiturVisitLog[]
+
+  @@index([loanAccountId, status])
+  @@index([status, targetDate])
+  @@map("ptp_trackings")
+}
+
+model SuratPeringatan {
+  id             String   @id @default(cuid())
+  nomorSP        String   @unique @db.VarChar(30)
+  accountNumber  String   @db.VarChar(25)
+  loanAccountId  String
+  branchId       String
+  issuedById     String
+  spLevel        SPLevel
+  tanggalTerbit  DateTime @default(now())
+  tanggalRespons DateTime? @db.Date
+  catatan        String?  @db.Text
+  createdAt      DateTime @default(now())
+
+  loanAccount LoanAccount @relation(fields: [loanAccountId], references: [id])
+  branch      Branch      @relation(fields: [branchId], references: [id])
+  issuedBy    User        @relation(fields: [issuedById], references: [id])
+
+  @@index([loanAccountId])
+  @@index([accountNumber])
+  @@index([branchId, tanggalTerbit])
+  @@map("surat_peringatans")
+}

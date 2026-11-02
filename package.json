@@ -1,0 +1,19 @@
+{
+  "name": "top-operator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "prisma generate",
+    "build": "npm --prefix apps/backoffice run build",
+    "start": "npm --prefix apps/backoffice run start"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}
