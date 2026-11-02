@@ -41,7 +41,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Co
     const collectorSummaries: CollectorSummary[] = [];
     const grandTotals: CollectionTotals = createEmptyTotals();
 
-    for (const [collectorId, ctasks] of byCollector) {
+    byCollector.forEach((ctasks, collectorId) => {
       const collector = ctasks[0].officer;
       const totals = createEmptyTotals();
 
@@ -54,13 +54,13 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Co
         const janjiBayar = t.statusBayar === 'JANJI_BAYAR';
 
         // Akumulasi totals
-        totals.totalDebitur++;
-        if (sudahBayar) totals.sudahBayar++;
-        if (belumDikunjungi) totals.belumDikunjungi++;
-        if (janjiBayar) totals.janjieBayar++;
-        totals.tagihanPokok += Number(t.tagihanPokok);
-        totals.tagihanBunga += Number(t.tagihanBunga);
-        totals.tagihanDenda += Number(t.tagihanDenda);
+        totals.totalDebitur = (totals.totalDebitur ?? 0) + 1;
+        if (sudahBayar) totals.sudahBayar = (totals.sudahBayar ?? 0) + 1;
+        if (belumDikunjungi) totals.belumDikunjungi = (totals.belumDikunjungi ?? 0) + 1;
+        if (janjiBayar) totals.janjieBayar = (totals.janjieBayar ?? 0) + 1;
+        totals.tagihanPokok = (totals.tagihanPokok ?? 0) + Number(t.tagihanPokok);
+        totals.tagihanBunga = (totals.tagihanBunga ?? 0) + Number(t.tagihanBunga);
+        totals.tagihanDenda = (totals.tagihanDenda ?? 0) + Number(t.tagihanDenda);
         totals.realisasiPokok += Number(t.terealisasiPokok);
         totals.realisasiBunga += Number(t.terealisasiBunga);
         totals.realisasiDenda += Number(t.terealisasiDenda);
@@ -94,13 +94,13 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Co
       });
 
       // Grand total
-      grandTotals.totalDebitur += totals.totalDebitur;
-      grandTotals.sudahBayar += totals.sudahBayar;
-      grandTotals.belumDikunjungi += totals.belumDikunjungi;
-      grandTotals.janjieBayar += totals.janjieBayar;
-      grandTotals.tagihanPokok += totals.tagihanPokok;
-      grandTotals.tagihanBunga += totals.tagihanBunga;
-      grandTotals.tagihanDenda += totals.tagihanDenda;
+      grandTotals.totalDebitur = (grandTotals.totalDebitur ?? 0) + (totals.totalDebitur ?? 0);
+      grandTotals.sudahBayar = (grandTotals.sudahBayar ?? 0) + (totals.sudahBayar ?? 0);
+      grandTotals.belumDikunjungi = (grandTotals.belumDikunjungi ?? 0) + (totals.belumDikunjungi ?? 0);
+      grandTotals.janjieBayar = (grandTotals.janjieBayar ?? 0) + (totals.janjieBayar ?? 0);
+      grandTotals.tagihanPokok = (grandTotals.tagihanPokok ?? 0) + (totals.tagihanPokok ?? 0);
+      grandTotals.tagihanBunga = (grandTotals.tagihanBunga ?? 0) + (totals.tagihanBunga ?? 0);
+      grandTotals.tagihanDenda = (grandTotals.tagihanDenda ?? 0) + (totals.tagihanDenda ?? 0);
       grandTotals.realisasiPokok += totals.realisasiPokok;
       grandTotals.realisasiBunga += totals.realisasiBunga;
       grandTotals.realisasiDenda += totals.realisasiDenda;
@@ -114,7 +114,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Co
         tasks: taskEntries as any,
         totals,
       });
-    }
+    });
 
     grandTotals.cashSettlementStatus = 'PENDING';
 

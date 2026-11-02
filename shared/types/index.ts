@@ -52,6 +52,11 @@ export interface VisitLogEntry {
   fieldNotes?: string | null;
   photoUrls: string[];
   hasPTP?: boolean;
+  ptpData?: {
+    nominalKomitmen: number;
+    targetDate: string;
+    status: PTPStatus;
+  } | null;
 }
 
 export interface PTPTrackingData {
@@ -115,21 +120,38 @@ export interface DebiturControllerData {
 
 export interface AOActivityEntry {
   id: string;
-  aoNama: string;
-  activityType: AOActivityType;
-  tanggal: string;
-  nominal: number | null;
-  titipanMuka: number | null;
-  keterangan: string | null;
-  debiturNama: string | null;
+  aoId?: string;
+  aoName?: string;
+  aoNama?: string;
+  activityDate?: string;
+  tanggal?: string;
+  activityType: AOActivityType | string;
+  activityTypeLabel?: string;
+  prospekName?: string;
+  prospekNominalPengajuan?: number;
+  nominal?: number | null;
+  nominalRealisasi?: number | null;
+  nominalTitipanMuka?: number | null;
+  titipanMuka?: number | null;
+  accountNumber?: string;
+  status?: string;
+  catatan?: string | null;
+  keterangan?: string | null;
+  debiturNama?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  photoUrls?: any;
 }
 
 export interface AODailyReport {
-  tanggal: string;
+  reportDate?: string;
+  tanggal?: string;
   branchCode: string;
+  branchName?: string;
   summary: {
     totalProspek: number;
-    totalSurvey: number;
+    totalSurvey?: number;
+    totalSurvei?: number;
     totalVerifikasi: number;
     totalBooking: number;
     totalRealisasi: number;
@@ -144,32 +166,58 @@ export interface AODailyReport {
 // COLLECTION DAILY REPORT
 // ─────────────────────────────────────────────
 
+export interface CollectionTotals {
+  totalDebitur?: number;
+  sudahBayar?: number;
+  belumDikunjungi?: number;
+  janjieBayar?: number;
+  tagihanPokok?: number;
+  tagihanBunga?: number;
+  tagihanDenda?: number;
+  targetPokok?: number;
+  targetBunga?: number;
+  targetDenda?: number;
+  targetTitipan?: number;
+  targetWO?: number;
+  totalTarget?: number;
+  realisasiPokok: number;
+  realisasiBunga: number;
+  realisasiDenda: number;
+  realisasiTitipan: number;
+  penerimaanWO: number;
+  totalRealisasi: number;
+  totalPokok?: number;
+  totalBunga?: number;
+  totalDenda?: number;
+  totalTitipan?: number;
+  totalWO?: number;
+  cashSettlementStatus?: 'PENDING' | 'SETTLED' | 'DIFFERENCE' | string;
+}
+
 export interface CollectorSummary {
   collectorId: string;
-  collectorNama: string;
-  totalTagihan: number;
-  totalPokok: number;
-  totalBunga: number;
-  totalDenda: number;
-  totalTitipan: number;
-  totalWO: number;
-  totalRealisasi: number;
-  jumlahDebitur: number;
-  jumlahSudahBayar: number;
+  collectorName?: string;
+  collectorNama?: string;
+  tasks?: any[];
+  totals: CollectionTotals;
+  totalTagihan?: number;
+  totalPokok?: number;
+  totalBunga?: number;
+  totalDenda?: number;
+  totalTitipan?: number;
+  totalWO?: number;
+  totalRealisasi?: number;
+  jumlahDebitur?: number;
+  jumlahSudahBayar?: number;
 }
 
 export interface CollectionDailyReport {
+  reportDate?: string;
   periodeTagih: string;
   branchCode: string;
-  collectors: CollectorSummary[];
-  grandTotal: {
-    totalPokok: number;
-    totalBunga: number;
-    totalDenda: number;
-    totalTitipan: number;
-    totalWO: number;
-    totalRealisasi: number;
-  };
+  collectors?: CollectorSummary[];
+  collectorSummaries?: CollectorSummary[];
+  grandTotal: CollectionTotals;
 }
 
 // ─────────────────────────────────────────────
@@ -177,9 +225,27 @@ export interface CollectionDailyReport {
 // ─────────────────────────────────────────────
 
 export type ControllerActionPayload =
-  | { action: 'GENERATE_SP';      accountNumber: string; level: SPLevel; branchId: string; keterangan?: string }
-  | { action: 'TOGGLE_AUTODEBIT'; accountNumber: string }
-  | { action: 'ALIHKAN_REMEDIAL'; accountNumber: string; keterangan?: string };
+  | {
+      action: 'GENERATE_SP';
+      accountNumber: string;
+      spLevel: SPLevel | string;
+      tanggalRespons: string;
+      catatan?: string;
+      level?: SPLevel;
+      branchId?: string;
+      keterangan?: string;
+    }
+  | {
+      action: 'TOGGLE_AUTODEBIT';
+      accountNumber: string;
+      enable?: boolean;
+    }
+  | {
+      action: 'ALIHKAN_REMEDIAL';
+      accountNumber: string;
+      catatan?: string;
+      keterangan?: string;
+    };
 
 // ─────────────────────────────────────────────
 // MOBILE VISIT FORM

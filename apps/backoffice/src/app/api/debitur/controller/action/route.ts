@@ -88,7 +88,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<u
             officerId: userId,
             latitude: 0,
             longitude: 0,
-            visitStatus: 'NO_CONTACT',
+            visitStatus: 'OTHER',
             fieldNotes: `[SISTEM] Dialihkan ke unit remedial. Catatan: ${catatan}`,
           },
         });

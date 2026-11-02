@@ -71,7 +71,7 @@ export function DaftarLeads() {
 
   function toggleAll() {
     setSelected((current) => (
-      allSelected ? current.filter((id) => !pageIds.includes(id)) : [...new Set([...current, ...pageIds])]
+      allSelected ? current.filter((id) => !pageIds.includes(id)) : Array.from(new Set([...current, ...pageIds]))
     ));
   }
 

@@ -234,7 +234,7 @@ function bookingSummary(activities: Activity[]) {
     }
     rows.set(name, current);
   }
-  return [...rows.values()];
+  return Array.from(rows.values());
 }
 
 function downloadAoCsv(report: Report) {

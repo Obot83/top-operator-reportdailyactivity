@@ -45,7 +45,7 @@ export async function GET() {
         }
       }
 
-      cachedOfficers = [...aoMap.entries()]
+      cachedOfficers = Array.from(aoMap.entries())
         .map(([id, info]) => ({ id, name: info.name, branch: info.branch }))
         .sort((a, b) => a.name.localeCompare(b.name, 'id'));
     }
