@@ -41,6 +41,20 @@ export type RawMongoStatus = {
   pengajuan: string | null;
 };
 
+export type SlaStatus = 'COMPLETED' | 'RUNNING' | 'CANCELLED' | 'NOT_STARTED';
+
+export type SlaInfo = {
+  duration_minutes: number | null;
+  formatted: string;
+  formatted_long: string;
+  badge_label: string;
+  status: SlaStatus;
+  start_time: string | null;
+  end_time: string | null;
+  is_complete: boolean;
+  description: string;
+};
+
 export type ActivityItem = {
   id: string;
   ao_id: string;
@@ -60,6 +74,7 @@ export type ActivityItem = {
   follow_up: string | null;
   nominal: number;
   source: 'lead' | 'group';
+  sla: SlaInfo;
 };
 
 export type ChartItem = { label: string; value: number };
@@ -77,6 +92,8 @@ export type DailySummary = {
   repeat_order_count: number;
   ao_aktif: number;
   prev_total: number;
+  avg_sla_completed_minutes?: number;
+  avg_sla_completed_formatted?: string;
   by_kategori: ChartItem[];
   by_status: ChartItem[];
   by_stage: StageCountItem[];
@@ -116,6 +133,8 @@ async function loadData(dateStr?: string, aoId?: string): Promise<{ leads: any[]
     const projection = {
       create_dtm: 1,
       create_user: 1,
+      update_dtm: 1,
+      update_user: 1,
       status: 1,
       flg: 1,
       pemohon: 1,
@@ -206,6 +225,204 @@ function toLocalDate(isoStr: string): string {
   const m = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+// ─── SLA Computation Helpers ──────────────────────────────────────────────────
+
+function formatSlaDuration(minutes: number | null): string {
+  if (minutes == null || isNaN(minutes) || minutes < 0) return '-';
+  if (minutes < 1) return '< 1 mnt';
+  if (minutes < 60) return `${minutes} mnt`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = minutes % 60;
+  if (hours < 24) {
+    return remainingMins > 0 ? `${hours}j ${remainingMins}m` : `${hours} jam`;
+  }
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days}h ${remainingHours}j` : `${days} hari`;
+}
+
+function formatSlaDurationLong(minutes: number | null): string {
+  if (minutes == null || isNaN(minutes) || minutes < 0) return '-';
+  if (minutes < 1) return 'Kurang dari 1 menit';
+  if (minutes < 60) return `${minutes} Menit`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = minutes % 60;
+  if (hours < 24) {
+    return remainingMins > 0 ? `${hours} Jam ${remainingMins} Menit` : `${hours} Jam`;
+  }
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  if (remainingHours > 0 && remainingMins > 0) {
+    return `${days} Hari ${remainingHours} Jam ${remainingMins} Menit`;
+  }
+  if (remainingHours > 0) {
+    return `${days} Hari ${remainingHours} Jam`;
+  }
+  return `${days} Hari`;
+}
+
+function computeLeadSla(
+  l: any,
+  status: ActivityStatus,
+  flowStageCode: FlowStageCode
+): SlaInfo {
+  // Step pengajuan mulai dari pengajuan.create_dtm (atau fallback create_dtm lead)
+  const pengajuanCreate = extractDate(l.pengajuan?.create_dtm);
+  const leadCreate = extractDate(l.create_dtm);
+  const startTime = pengajuanCreate || leadCreate || null;
+
+  // SLA berhenti saat Pengajuan Status Complete: pengajuan.update_dtm || lead.update_dtm
+  const pengajuanUpdate = extractDate(l.pengajuan?.update_dtm);
+  const leadUpdate = extractDate(l.update_dtm);
+  const finalUpdate = pengajuanUpdate || leadUpdate || null;
+
+  if (!startTime) {
+    return {
+      duration_minutes: null,
+      formatted: '-',
+      formatted_long: '-',
+      badge_label: '-',
+      status: 'NOT_STARTED',
+      start_time: null,
+      end_time: null,
+      is_complete: false,
+      description: 'Step pengajuan belum dimulai',
+    };
+  }
+
+  const startMs = new Date(startTime).getTime();
+
+  // Pengajuan Status Complete -> SLA BERHENTI
+  if (status === 'Completed' || flowStageCode === 'PENGAJUAN_COMPLETED') {
+    const endMs = finalUpdate ? new Date(finalUpdate).getTime() : startMs;
+    const diffMs = Math.max(0, endMs - startMs);
+    const minutes = Math.round(diffMs / 60000);
+    const formatted = formatSlaDuration(minutes);
+    const formatted_long = formatSlaDurationLong(minutes);
+
+    return {
+      duration_minutes: minutes,
+      formatted,
+      formatted_long,
+      badge_label: `${formatted} (Selesai)`,
+      status: 'COMPLETED',
+      start_time: startTime,
+      end_time: finalUpdate || startTime,
+      is_complete: true,
+      description: `SLA Berhenti: Pengajuan telah disetujui / Complete (${formatted_long})`,
+    };
+  }
+
+  // Ditolak / Dibatalkan (Komite / Survey / SLIK) -> SLA BERHENTI (Batal/Reject)
+  if (
+    status === 'Cancelled' ||
+    flowStageCode === 'KOMITE_REJECTED' ||
+    flowStageCode === 'SURVEY_CANCELED' ||
+    flowStageCode === 'SLIK_REJECTED'
+  ) {
+    const endMs = finalUpdate ? new Date(finalUpdate).getTime() : startMs;
+    const diffMs = Math.max(0, endMs - startMs);
+    const minutes = Math.round(diffMs / 60000);
+    const formatted = formatSlaDuration(minutes);
+    const formatted_long = formatSlaDurationLong(minutes);
+
+    return {
+      duration_minutes: minutes,
+      formatted,
+      formatted_long,
+      badge_label: `${formatted} (Batal)`,
+      status: 'CANCELLED',
+      start_time: startTime,
+      end_time: finalUpdate || startTime,
+      is_complete: false,
+      description: `SLA Berhenti: Pengajuan ditolak atau dibatalkan (${formatted_long})`,
+    };
+  }
+
+  // Belum Complete (Review Komite / Sedang Survey / Input Leads) -> SLA MASIH BERJALAN
+  const nowMs = Date.now();
+  const diffMs = Math.max(0, nowMs - startMs);
+  const minutes = Math.round(diffMs / 60000);
+  const formatted = formatSlaDuration(minutes);
+  const formatted_long = formatSlaDurationLong(minutes);
+
+  return {
+    duration_minutes: minutes,
+    formatted,
+    formatted_long,
+    badge_label: `Berjalan (${formatted})`,
+    status: 'RUNNING',
+    start_time: startTime,
+    end_time: null,
+    is_complete: false,
+    description: `SLA Berjalan: Masih dalam proses pengajuan (berjalan ${formatted_long})`,
+  };
+}
+
+function computeGroupSla(
+  g: any,
+  status: ActivityStatus,
+  flowStageCode: FlowStageCode
+): SlaInfo {
+  const startTime = extractDate(g.create_dtm) || null;
+  const finalUpdate = extractDate(g.update_dtm) || extractDate(g.updated_at) || null;
+
+  if (!startTime) {
+    return {
+      duration_minutes: null,
+      formatted: '-',
+      formatted_long: '-',
+      badge_label: '-',
+      status: 'NOT_STARTED',
+      start_time: null,
+      end_time: null,
+      is_complete: false,
+      description: 'Step pengajuan kelompok belum dimulai',
+    };
+  }
+
+  const startMs = new Date(startTime).getTime();
+
+  if (status === 'Completed' || flowStageCode === 'PENGAJUAN_COMPLETED') {
+    const endMs = finalUpdate ? new Date(finalUpdate).getTime() : startMs;
+    const diffMs = Math.max(0, endMs - startMs);
+    const minutes = Math.round(diffMs / 60000);
+    const formatted = formatSlaDuration(minutes);
+    const formatted_long = formatSlaDurationLong(minutes);
+
+    return {
+      duration_minutes: minutes,
+      formatted,
+      formatted_long,
+      badge_label: `${formatted} (Selesai)`,
+      status: 'COMPLETED',
+      start_time: startTime,
+      end_time: finalUpdate || startTime,
+      is_complete: true,
+      description: `SLA Berhenti: Validasi kelompok selesai / Complete (${formatted_long})`,
+    };
+  }
+
+  // Pending
+  const nowMs = Date.now();
+  const diffMs = Math.max(0, nowMs - startMs);
+  const minutes = Math.round(diffMs / 60000);
+  const formatted = formatSlaDuration(minutes);
+  const formatted_long = formatSlaDurationLong(minutes);
+
+  return {
+    duration_minutes: minutes,
+    formatted,
+    formatted_long,
+    badge_label: `Berjalan (${formatted})`,
+    status: 'RUNNING',
+    start_time: startTime,
+    end_time: null,
+    is_complete: false,
+    description: `SLA Berjalan: Menunggu validasi kelompok (berjalan ${formatted_long})`,
+  };
 }
 
 // ─── Flow & Status Determination Based on Real Flow & PDF Spec ────────────────
@@ -521,6 +738,7 @@ export async function GET(req: NextRequest) {
       const nominal = extractNumber(l.pengajuan?.submission?.loan);
       const hasil_aktivitas: string = l.keterangan?.sales ?? '';
       const follow_up: string | null = extractDate(l.survey_dtm) || null;
+      const sla = computeLeadSla(l, status, flow_stage.code);
 
       const raw_status: RawMongoStatus = {
         lead: l.status?.lead ?? null,
@@ -531,7 +749,7 @@ export async function GET(req: NextRequest) {
 
       if (q) {
         const rawJsonStr = JSON.stringify(raw_status).toLowerCase();
-        const hay = `${l._id} ${debitur} ${ao_id} ${ao_name} ${hasil_aktivitas} ${flow_stage.name} ${application_type.label} ${rawJsonStr}`.toLowerCase();
+        const hay = `${l._id} ${debitur} ${ao_id} ${ao_name} ${hasil_aktivitas} ${flow_stage.name} ${application_type.label} ${sla.formatted} ${rawJsonStr}`.toLowerCase();
         if (!hay.includes(q)) continue;
       }
 
@@ -554,6 +772,7 @@ export async function GET(req: NextRequest) {
         follow_up,
         nominal,
         source: 'lead',
+        sla,
       });
     }
 
@@ -611,6 +830,7 @@ export async function GET(req: NextRequest) {
 
       const ao_name: string = (g.sales?.name ?? '').trim() || ao_id;
       const debitur: string = g.group_name ?? '-';
+      const sla = computeGroupSla(g, status, flow_stage.code);
 
       const raw_status: RawMongoStatus = {
         lead: 'GROUP',
@@ -620,7 +840,7 @@ export async function GET(req: NextRequest) {
       };
 
       if (q) {
-        const hay = `${g._id} ${debitur} ${ao_id} ${ao_name} ${flow_stage.name}`.toLowerCase();
+        const hay = `${g._id} ${debitur} ${ao_id} ${ao_name} ${flow_stage.name} ${sla.formatted}`.toLowerCase();
         if (!hay.includes(q)) continue;
       }
 
@@ -643,6 +863,7 @@ export async function GET(req: NextRequest) {
         follow_up: null,
         nominal: 0,
         source: 'group',
+        sla,
       });
     }
 
@@ -711,6 +932,18 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
 
+    const completedWithSla = activities.filter(
+      (a) => a.sla.is_complete && a.sla.duration_minutes != null
+    );
+    const avg_sla_completed_minutes =
+      completedWithSla.length > 0
+        ? Math.round(
+            completedWithSla.reduce((acc, cur) => acc + (cur.sla.duration_minutes || 0), 0) /
+              completedWithSla.length
+          )
+        : 0;
+    const avg_sla_completed_formatted = formatSlaDuration(avg_sla_completed_minutes);
+
     const summary: DailySummary = {
       total: activities.length,
       completed,
@@ -722,6 +955,8 @@ export async function GET(req: NextRequest) {
       repeat_order_count,
       ao_aktif,
       prev_total: 0,
+      avg_sla_completed_minutes,
+      avg_sla_completed_formatted,
       by_kategori,
       by_status,
       by_stage,

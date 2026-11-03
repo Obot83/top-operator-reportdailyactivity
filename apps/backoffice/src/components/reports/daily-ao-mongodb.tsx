@@ -37,7 +37,7 @@ import {
   AlertCircle,
   ClipboardCheck,
 } from 'lucide-react';
-import { formatRupiah } from '@/lib/formatters';
+import { formatRupiah, formatDateTime } from '@/lib/formatters';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,6 +79,20 @@ export type RawMongoStatus = {
   pengajuan: string | null;
 };
 
+export type SlaStatus = 'COMPLETED' | 'RUNNING' | 'CANCELLED' | 'NOT_STARTED';
+
+export type SlaInfo = {
+  duration_minutes: number | null;
+  formatted: string;
+  formatted_long: string;
+  badge_label: string;
+  status: SlaStatus;
+  start_time: string | null;
+  end_time: string | null;
+  is_complete: boolean;
+  description: string;
+};
+
 export type ActivityItem = {
   id: string;
   ao_id: string;
@@ -98,6 +112,7 @@ export type ActivityItem = {
   follow_up: string | null;
   nominal: number;
   source: 'lead' | 'group';
+  sla: SlaInfo;
 };
 
 type ChartItem = { label: string; value: number };
@@ -116,6 +131,8 @@ type DailyReportData = {
     repeat_order_count: number;
     ao_aktif: number;
     prev_total: number;
+    avg_sla_completed_minutes?: number;
+    avg_sla_completed_formatted?: string;
     by_kategori: ChartItem[];
     by_status: ChartItem[];
     by_stage: StageCountItem[];
@@ -573,8 +590,9 @@ export function DailyAoMongoReport() {
       'Tipe Pengajuan',
       'Kategori',
       'Tracking Proses',
-      'Status',
       'Status Leads (Lead/CC/Survey/Pengajuan)',
+      'Status',
+      'SLA Pengajuan (Step Pengajuan -> Complete)',
       'Interpretasi Data',
       'Referensi',
       'Hasil Aktivitas',
@@ -591,8 +609,9 @@ export function DailyAoMongoReport() {
       `"${a.application_type.label}"`,
       a.kategori,
       `"${a.flow_stage.name}"`,
-      a.status,
       `"${a.raw_status.lead ?? '-'}|${a.raw_status.credit_checking ?? '-'}|${a.raw_status.survey ?? '-'}|${a.raw_status.pengajuan ?? '-'}"`,
+      a.status,
+      `"${a.sla?.formatted || '-'} (${a.sla?.status === 'COMPLETED' ? 'Selesai' : a.sla?.status === 'RUNNING' ? 'Berjalan' : a.sla?.status === 'CANCELLED' ? 'Batal' : '-'})"`,
       `"${(a.interpretation || '-').replace(/"/g, '""')}"`,
       a.referensi,
       `"${(a.hasil_aktivitas || '-').replace(/"/g, '""')}"`,
@@ -956,9 +975,19 @@ export function DailyAoMongoReport() {
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{summary.completed}</span>
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            <span className="font-bold text-emerald-600">{pctCompleted}%</span> Selesai approval KC
-          </p>
+          <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+            <span>
+              <span className="font-bold text-emerald-600">{pctCompleted}%</span> Selesai approval KC
+            </span>
+            {summary.avg_sla_completed_formatted && summary.avg_sla_completed_formatted !== '-' && (
+              <span
+                className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                title={`Rata-rata SLA Pengajuan Complete: ${summary.avg_sla_completed_formatted}`}
+              >
+                Avg SLA: {summary.avg_sla_completed_formatted}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Card 3: Review Komite */}
@@ -1119,7 +1148,7 @@ export function DailyAoMongoReport() {
 
         {/* Table Responsive Wrapper */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600 min-w-[1080px]">
+          <table className="w-full text-left text-xs text-slate-600 min-w-[1180px]">
             <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-3.5 w-12 text-center">No</th>
@@ -1132,20 +1161,26 @@ export function DailyAoMongoReport() {
                 <th className="py-3.5 px-3.5">Status Leads</th>
                 <th className="py-3.5 px-3.5">Hasil / Catatan</th>
                 <th className="py-3.5 px-3.5">Status</th>
+                <th
+                  className="py-3.5 px-3.5 whitespace-nowrap"
+                  title="SLA: Dihitung dari Step Pengajuan sampai dengan Pengajuan Status Complete"
+                >
+                  SLA Pengajuan
+                </th>
                 <th className="py-3.5 px-3.5 text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {reportQuery.isLoading ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400 text-xs">
+                  <td colSpan={12} className="py-12 text-center text-slate-400 text-xs">
                     <div className="inline-block animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent mb-2" />
                     <p>Memuat data aktivitas real sistem...</p>
                   </td>
                 </tr>
               ) : activities.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
+                  <td colSpan={12} className="py-12 text-center text-slate-400">
                     <p className="font-bold text-slate-700 text-sm">Tidak ada aktivitas ditemukan</p>
                     <p className="text-xs mt-1 text-slate-400">Coba ubah tanggal atau filter yang digunakan.</p>
                   </td>
@@ -1273,6 +1308,41 @@ export function DailyAoMongoReport() {
                           />
                           {item.status}
                         </span>
+                      </td>
+
+                      {/* SLA Pengajuan */}
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        {item.sla ? (
+                          item.sla.status === 'COMPLETED' ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              title={`SLA Selesai: ${item.sla.formatted_long || item.sla.formatted} (Berhenti di Pengajuan Complete)\nMulai: ${item.sla.start_time ? formatDateTime(item.sla.start_time) : '-'}\nSelesai: ${item.sla.end_time ? formatDateTime(item.sla.end_time) : '-'}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span>{item.sla.formatted}</span>
+                            </span>
+                          ) : item.sla.status === 'RUNNING' ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"
+                              title={`SLA Berjalan: Masih dalam proses (${item.flow_stage.name}), belum complete\nMulai: ${item.sla.start_time ? formatDateTime(item.sla.start_time) : '-'}`}
+                            >
+                              <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse shrink-0" />
+                              <span>Berjalan ({item.sla.formatted})</span>
+                            </span>
+                          ) : item.sla.status === 'CANCELLED' ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200"
+                              title={`SLA Berhenti: Proses dibatalkan/ditolak (${item.flow_stage.name})\nMulai: ${item.sla.start_time ? formatDateTime(item.sla.start_time) : '-'}\nBerhenti: ${item.sla.end_time ? formatDateTime(item.sla.end_time) : '-'}`}
+                            >
+                              <XCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span>{item.sla.formatted} (Batal)</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">-</span>
+                          )
+                        ) : (
+                          <span className="text-slate-400 text-xs">-</span>
+                        )}
                       </td>
 
                       {/* Aksi */}
@@ -1499,6 +1569,94 @@ export function DailyAoMongoReport() {
                   ))}
                 </div>
               </div>
+
+              {/* ── Informasi SLA Pengajuan (Step Pengajuan → Complete) ── */}
+              {selectedItem.sla && (
+                <div className="p-4 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-blue-50/40 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                    <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-blue-600" />
+                      <span>SLA Pengajuan (Step Pengajuan → Pengajuan Status Complete)</span>
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
+                        selectedItem.sla.status === 'COMPLETED'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : selectedItem.sla.status === 'RUNNING'
+                          ? 'bg-amber-50 text-amber-800 border-amber-300'
+                          : selectedItem.sla.status === 'CANCELLED'
+                          ? 'bg-rose-50 text-rose-800 border-rose-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {selectedItem.sla.status === 'COMPLETED' ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span>SLA Berhenti (Complete)</span>
+                        </>
+                      ) : selectedItem.sla.status === 'RUNNING' ? (
+                        <>
+                          <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                          <span>SLA Berjalan</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-3 h-3 text-rose-600" />
+                          <span>SLA Berhenti (Batal/Reject)</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Mulai Step Pengajuan
+                      </span>
+                      <span className="text-xs font-extrabold text-slate-800 block mt-1">
+                        {selectedItem.sla.start_time ? formatDateTime(selectedItem.sla.start_time) : '-'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        Waktu pembuatan berkas pengajuan
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Stop SLA (Status Complete)
+                      </span>
+                      <span className="text-xs font-extrabold text-slate-800 block mt-1">
+                        {selectedItem.sla.is_complete && selectedItem.sla.end_time
+                          ? formatDateTime(selectedItem.sla.end_time)
+                          : selectedItem.sla.status === 'RUNNING'
+                          ? 'Menunggu Pengajuan Complete'
+                          : selectedItem.sla.end_time
+                          ? formatDateTime(selectedItem.sla.end_time)
+                          : '-'}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                        {selectedItem.sla.is_complete
+                          ? 'SLA berhenti di approval memorandum KC'
+                          : selectedItem.sla.status === 'RUNNING'
+                          ? 'Timer SLA masih terus berjalan'
+                          : 'Proses pengajuan dihentikan'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-white rounded-xl border border-blue-200 shadow-2xs bg-blue-50/30">
+                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+                        Total Durasi SLA
+                      </span>
+                      <span className="text-sm font-extrabold text-blue-900 block mt-0.5">
+                        {selectedItem.sla.formatted_long || selectedItem.sla.formatted}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5 leading-snug">
+                        {selectedItem.sla.description}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Grid 2 Columns: Informasi Petugas & Detail Tracking */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
