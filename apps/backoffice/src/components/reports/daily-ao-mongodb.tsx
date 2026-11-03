@@ -586,7 +586,7 @@ export function DailyAoMongoReport() {
       'Waktu',
       'AO ID',
       'Nama AO',
-      'Debitur/Prospect',
+      'Nama Debitur/Nama Kelompok',
       'Tipe Pengajuan',
       'Kategori',
       'Tracking Proses',
@@ -1154,7 +1154,7 @@ export function DailyAoMongoReport() {
                 <th className="py-3.5 px-3.5 w-12 text-center">No</th>
                 <th className="py-3.5 px-3.5 whitespace-nowrap">Waktu</th>
                 <th className="py-3.5 px-3.5">AO</th>
-                <th className="py-3.5 px-3.5">Debitur / Calon Nasabah</th>
+                <th className="py-3.5 px-3.5">Nama Debitur/Nama Kelompok</th>
                 <th className="py-3.5 px-3.5 whitespace-nowrap">Tipe</th>
                 <th className="py-3.5 px-3.5">Kategori</th>
                 <th className="py-3.5 px-3.5">Tracking Proses</th>
@@ -1488,7 +1488,7 @@ export function DailyAoMongoReport() {
               <div className="p-4 rounded-xl border border-blue-100/80 bg-gradient-to-br from-blue-50/60 to-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                    Nama Debitur / Calon Nasabah
+                    Nama Debitur/Nama Kelompok
                   </span>
                   <h4 className="text-lg font-extrabold text-slate-900 leading-tight">
                     {selectedItem.debitur}
