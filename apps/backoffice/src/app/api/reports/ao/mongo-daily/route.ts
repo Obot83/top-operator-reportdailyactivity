@@ -673,6 +673,32 @@ function getKategori(l: any): 'Produk UMI' | 'Produk Sertifikat' {
   return 'Produk Sertifikat';
 }
 
+function resolveDebiturName(l: any): string {
+  let name = (l.pemohon?.name ?? '').trim();
+
+  // Filter/bersihkan nilai placeholder dummy testing form
+  const isInvalidPlaceholder =
+    !name ||
+    /^applicant.*(spouse|lec|data)/i.test(name) ||
+    /^no\s+(lec|spouse|guarantor)/i.test(name) ||
+    /^is\s+gurar?antor/i.test(name) ||
+    /^(test|testing|dummy|sample)$/i.test(name);
+
+  if (isInvalidPlaceholder) {
+    if (l.pemohon?.ktp?.name) return l.pemohon.ktp.name;
+    if (l.spouse?.name) return `${l.spouse.name} (Pasangan)`;
+    return name || '-';
+  }
+
+  // Bersihkan postfix kata "test" seperti "Mustafa Kamal test" -> "Mustafa Kamal"
+  if (/\btest\b/i.test(name) && name.length > 5) {
+    const cleaned = name.replace(/\btest\b/gi, '').trim();
+    if (cleaned) return cleaned;
+  }
+
+  return name;
+}
+
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -733,7 +759,7 @@ export async function GET(req: NextRequest) {
       // Application type filter
       if (appTypeFilter !== 'all' && application_type.type !== appTypeFilter) continue;
 
-      const debitur: string = l.pemohon?.name ?? '-';
+      const debitur = resolveDebiturName(l);
       const ao_name: string = aoNames.get(ao_id) ?? ao_id;
       const nominal = extractNumber(l.pengajuan?.submission?.loan);
       const hasil_aktivitas: string = l.keterangan?.sales ?? '';
