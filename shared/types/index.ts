@@ -120,6 +120,19 @@ export interface DebtorGuarantorDetail {
   ktpPhotoUrl?: string;
 }
 
+export interface DebtorCollateralFile {
+  id: string;
+  name: string;
+  category: 'SERTIFIKAT' | 'FOTO_EKSTERIOR' | 'FOTO_INTERIOR' | 'SURVEY_LOKASI' | 'LAINNYA';
+  categoryLabel: string;
+  notes?: string | null;
+  path: string;
+  from?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  createdAt?: string;
+}
+
 export interface DebtorCollateralDetail {
   unitName: string;
   certificateType?: string;
@@ -127,6 +140,8 @@ export interface DebtorCollateralDetail {
   location?: string;
   typeMerk?: string;
   description?: string;
+  leadId?: string;
+  files?: DebtorCollateralFile[];
 }
 
 export interface DebtorCreditCapacity {
@@ -212,6 +227,9 @@ export interface DebiturControllerData {
   collaterals?: DebtorCollateralDetail[];
   creditCapacity?: DebtorCreditCapacity;
   otherContracts?: DebtorOtherContractItem[];
+  productCategory?: 'UMI' | 'SERTIFIKAT' | 'LAINNYA';
+  isUmiProduct?: boolean;
+  isCertificateProduct?: boolean;
 }
 
 // ─────────────────────────────────────────────

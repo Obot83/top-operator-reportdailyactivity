@@ -98,6 +98,9 @@ export default function DebiturControllerPage() {
     collaterals = [],
     creditCapacity,
     otherContracts = [],
+    productCategory,
+    isUmiProduct = false,
+    isCertificateProduct = false,
   } = data;
 
   const handleGenerateSP = (spLevel: string) => {
@@ -572,49 +575,142 @@ export default function DebiturControllerPage() {
                     <Landmark className="h-4 w-4 text-amber-500" />
                     <CardTitle className="text-base">Data Agunan (Jaminan)</CardTitle>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {collaterals.length > 0 ? `${collaterals.length} Agunan` : 'Tanpa Agunan'}
-                  </Badge>
+                  {isUmiProduct ? (
+                    <Badge variant="outline" className="text-xs text-muted-foreground border-border">
+                      Tanpa Agunan (Produk UMI)
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs font-semibold">
+                      Produk Sertifikat ({collaterals[0]?.files?.length || 0} Berkas Agunan)
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="pt-4 text-xs">
-                {collaterals.length > 0 ? (
-                  <div className="space-y-3">
+                {isUmiProduct ? (
+                  <div className="py-8 text-center text-muted-foreground space-y-2">
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-1">
+                      <Shield className="h-6 w-6" />
+                    </div>
+                    <h4 className="font-semibold text-sm text-foreground">
+                      Produk Pembiayaan Mikro UMI (Tanpa Agunan Fisik)
+                    </h4>
+                    <p className="text-xs max-w-sm mx-auto text-muted-foreground leading-relaxed">
+                      Sesuai skema pembiayaan UMI (Ultra Mikro), fasilitas pembiayaan ini tidak mempersyaratkan agunan / jaminan fisik dan menggunakan sistem tanggung renteng kelompok.
+                    </p>
+                  </div>
+                ) : collaterals.length > 0 ? (
+                  <div className="space-y-4">
                     {collaterals.map((c, idx) => (
-                      <div
-                        key={idx}
-                        className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 hover:bg-muted/40 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-foreground text-sm">{c.unitName}</span>
-                          {c.certificateType && (
-                            <Badge variant="secondary" className="text-[10px] font-mono">
-                              {c.certificateType}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px]">
-                          <div>
-                            <span className="text-muted-foreground block">Nilai Taksasi Pasar</span>
-                            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                              {c.taksasi ? formatRupiah(c.taksasi) : '-'}
+                      <div key={idx} className="space-y-3">
+                        {/* Banner Relasi MongoDB Collection files */}
+                        {c.leadId && (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-[11px] flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                            <div>
+                              <span className="font-semibold text-amber-900 dark:text-amber-200">
+                                Relasi Database MongoDB:
+                              </span>{' '}
+                              Collection <code className="font-mono bg-muted px-1 py-0.5 rounded text-foreground font-bold">files</code>{' '}
+                              dengan{' '}
+                              <code className="font-mono bg-muted px-1 py-0.5 rounded text-foreground font-bold">
+                                &quot;ref_id&quot;: &quot;{c.leadId}&quot;
+                              </code>
+                            </div>
+                            <span className="font-mono text-[10px] text-amber-700 dark:text-amber-400 font-semibold shrink-0">
+                              Leads ID: {c.leadId}
                             </span>
                           </div>
-                          <div>
-                            <span className="text-muted-foreground block">Lokasi / Wilayah</span>
-                            <span className="font-medium text-foreground">{c.location || '-'}</span>
+                        )}
+
+                        {/* Ringkasan Properti Agunan */}
+                        <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-2">
+                          <div className="flex items-center justify-between flex-wrap gap-1">
+                            <span className="font-bold text-foreground text-sm flex items-center gap-1.5">
+                              <Landmark className="h-4 w-4 text-amber-600" />
+                              {c.unitName}
+                            </span>
+                            {c.certificateType && (
+                              <Badge variant="secondary" className="text-[10px] font-mono font-bold bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/20">
+                                {c.certificateType}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div>
+                              <span className="text-muted-foreground block text-[10px]">Nilai Taksasi Pasar</span>
+                              <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 text-xs">
+                                {c.taksasi ? formatRupiah(c.taksasi) : 'Taksasi Surveyor'}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[10px]">Lokasi / Wilayah</span>
+                              <span className="font-medium text-foreground">{c.location || debitur.domisiliKota || '-'}</span>
+                            </div>
                           </div>
                         </div>
-                        {c.typeMerk && (
-                          <div className="text-[11px]">
-                            <span className="text-muted-foreground block">Merk / Tipe</span>
-                            <span className="font-medium text-foreground">{c.typeMerk}</span>
-                          </div>
-                        )}
-                        {c.description && (
-                          <div className="text-[11px]">
-                            <span className="text-muted-foreground block">Keterangan Agunan</span>
-                            <p className="font-medium text-foreground">{c.description}</p>
+
+                        {/* Berkas & Foto Agunan dari Collection files */}
+                        {c.files && c.files.length > 0 && (
+                          <div className="space-y-2 pt-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-xs text-foreground flex items-center gap-1">
+                                <Camera className="h-3.5 w-3.5 text-primary" /> Berkas Dokumen & Foto Agunan ({c.files.length} file)
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">Sumber: collection files</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {c.files.map((file) => (
+                                <div
+                                  key={file.id}
+                                  className="rounded-lg border border-border/70 bg-card p-2.5 space-y-1 hover:border-primary/40 transition-colors shadow-xs"
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="font-semibold text-foreground text-[11px] truncate" title={file.name}>
+                                      {file.name}
+                                    </span>
+                                    <span
+                                      className={`text-[9px] px-1.5 py-0.2 rounded font-semibold shrink-0 ${
+                                        file.category === 'SERTIFIKAT'
+                                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+                                          : file.category === 'SURVEY_LOKASI'
+                                          ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30'
+                                          : 'bg-muted text-muted-foreground border border-border'
+                                      }`}
+                                    >
+                                      {file.categoryLabel.split(' ')[0]}
+                                    </span>
+                                  </div>
+
+                                  {file.notes && (
+                                    <p className="text-[10px] text-muted-foreground font-mono bg-muted/40 px-1 py-0.2 rounded w-fit">
+                                      Keterangan: {file.notes}
+                                    </p>
+                                  )}
+
+                                  <div className="text-[10px] text-muted-foreground font-mono truncate" title={file.path}>
+                                    {file.path}
+                                  </div>
+
+                                  {file.latitude && file.longitude && (
+                                    <div className="pt-0.5 flex items-center justify-between text-[10px]">
+                                      <span className="text-muted-foreground font-mono">
+                                        GPS: {file.latitude.toFixed(5)}, {file.longitude.toFixed(5)}
+                                      </span>
+                                      <a
+                                        href={`https://www.google.com/maps?q=${file.latitude},${file.longitude}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-0.5 text-primary hover:underline font-medium"
+                                      >
+                                        Buka Maps <ExternalLink className="h-2.5 w-2.5" />
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -623,9 +719,9 @@ export default function DebiturControllerPage() {
                 ) : (
                   <div className="py-8 text-center text-muted-foreground space-y-1">
                     <Landmark className="h-8 w-8 mx-auto text-muted-foreground/40 mb-1" />
-                    <p className="font-medium text-foreground">Pembiayaan Tanpa Agunan Fisik</p>
+                    <p className="font-medium text-foreground">Berkas Agunan Tidak Ditemukan</p>
                     <p className="text-[11px] max-w-xs mx-auto">
-                      Produk pembiayaan mikro / kelompok tanpa agunan fisik dengan skema tanggung renteng.
+                      Tidak ditemukan berkas agunan di collection files untuk Leads ID ini.
                     </p>
                   </div>
                 )}

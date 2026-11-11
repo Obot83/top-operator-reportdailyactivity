@@ -11,9 +11,94 @@ import type {
   DebtorSpouseDetail,
   DebtorGuarantorDetail,
   DebtorCollateralDetail,
+  DebtorCollateralFile,
   DebtorCreditCapacity,
   DebtorOtherContractItem,
 } from '@/shared/types';
+
+function categorizeAgunanFile(f: any): { category: DebtorCollateralFile['category']; categoryLabel: string } {
+  const name = String(f.name || '').toUpperCase();
+  const notes = String(f.notes || '').toUpperCase();
+
+  if (
+    name.includes('SHM') ||
+    name.includes('SHGB') ||
+    notes.includes('SHM') ||
+    notes.includes('SHGB') ||
+    notes.includes('SERTIFIKAT') ||
+    name === 'DOC_AGUNAN' ||
+    name === 'DOC_PDF'
+  ) {
+    return { category: 'SERTIFIKAT', categoryLabel: 'Dokumen Sertifikat & Legalitas (SHM/SHGB)' };
+  }
+  if (
+    name.includes('DEPAN') ||
+    name.includes('KANAN') ||
+    name.includes('KIRI') ||
+    name.includes('BELAKANG') ||
+    name.includes('JALAN') ||
+    name.includes('MIRING') ||
+    notes.includes('RUMAH_LUAR') ||
+    notes.includes('RKO') ||
+    notes.includes('TNH')
+  ) {
+    return { category: 'FOTO_EKSTERIOR', categoryLabel: 'Foto Tampak Luar / Eksterior Agunan' };
+  }
+  if (
+    name.includes('DALAM') ||
+    name.includes('RUANG') ||
+    name.includes('KAMAR') ||
+    name.includes('DAPUR') ||
+    name.includes('LISTRIK') ||
+    notes.includes('RUMAH_DALAM')
+  ) {
+    return { category: 'FOTO_INTERIOR', categoryLabel: 'Foto Tampak Dalam / Interior Agunan' };
+  }
+  if (name.includes('SURVEY') || f.location?.coordinates) {
+    return { category: 'SURVEY_LOKASI', categoryLabel: 'Foto & Titik Koordinat Lokasi Survey Agunan' };
+  }
+  return { category: 'LAINNYA', categoryLabel: 'Foto Pendukung Agunan' };
+}
+
+function isAgunanFile(f: any): boolean {
+  const name = String(f.name || '').toUpperCase();
+  const notes = String(f.notes || '').toUpperCase();
+
+  // Exclude purely personal identity files
+  if (name.includes('KTP_PEMOHON') || name.includes('KTP_PASANGAN') || name.includes('SLIK')) {
+    return false;
+  }
+  if (name === 'DOC_IDENTITAS' && !notes.includes('RUMAH') && !notes.includes('AGUNAN') && !notes.includes('SERTIFIKAT')) {
+    return false;
+  }
+  if (name.includes('FACE_IMAGE') || name.includes('PEFINDO')) {
+    return false;
+  }
+
+  // Include agunan and physical inspection files
+  if (
+    name.includes('SHM') ||
+    name.includes('SHGB') ||
+    name === 'DOC_AGUNAN' ||
+    name === 'DOC_MAIN-FOTO-AGUNAN' ||
+    name.includes('TAMPAK') ||
+    name.includes('DAPUR') ||
+    name.includes('RUANG TAMU') ||
+    name.includes('KAMAR') ||
+    name.includes('LISTRIK') ||
+    name.includes('SURVEY') ||
+    notes.includes('SHM') ||
+    notes.includes('SHGB') ||
+    notes.includes('SERTIFIKAT') ||
+    notes.includes('RMH') ||
+    notes.includes('RUMAH') ||
+    notes.includes('TNH') ||
+    notes.includes('RKO')
+  ) {
+    return true;
+  }
+  return false;
+}
 
 function calculateRiskScore(params: {
   dpd: number;
@@ -405,31 +490,96 @@ export async function GET(
           });
         }
 
-        // ── 8. Data Agunan ───────────────────────────────────────────
+        // ── 8. Pengecekan Produk: UMI vs SERTIFIKAT ─────────────────
+        const rawProductName = String(
+          lead?.pengajuan?.product?.product_name ||
+          contract.loan?.product_name ||
+          (plafon > 15000000 ? 'Pinjaman Sertifikat' : 'Pembiayaan Mikro UMI')
+        ).toUpperCase();
+
+        const certsList = Array.isArray(lead?.pengajuan?.product?.certificates_name)
+          ? (lead.pengajuan.product.certificates_name as string[])
+          : [];
+        const hasCertificates = certsList.length > 0;
+        const productId = String(lead?.pengajuan?.product?.id || '');
+
+        const isCertificateProduct =
+          rawProductName.includes('SERTIFIKAT') ||
+          rawProductName.includes('KSP') ||
+          ['006', '007', '008', '009'].includes(productId) ||
+          hasCertificates;
+
+        const isUmiProduct = !isCertificateProduct;
+        const productCategory: 'UMI' | 'SERTIFIKAT' | 'LAINNYA' = isCertificateProduct
+          ? 'SERTIFIKAT'
+          : isUmiProduct
+          ? 'UMI'
+          : 'LAINNYA';
+
+        // ── 9. Data Agunan ───────────────────────────────────────────
+        // Jika produk adalah UMI: Data Agunan (Jaminan) TIDAK ADA
+        // Jika produk adalah Sertifikat: Data Agunan direlasikan ke collection 'files' di MongoDB dengan relasi "ref_id": Leads ID
         const collaterals: DebtorCollateralDetail[] = [];
-        if (Array.isArray(contract.detail_agunan)) {
-          for (const ag of contract.detail_agunan) {
-            collaterals.push({
-              unitName: ag.unit_name || 'Agunan Properti / Sertifikat',
-              certificateType: ag.certificate_type || undefined,
-              taksasi: Number(ag.taksasi) || undefined,
-              location: ag.city_province || undefined,
-              typeMerk: ag.type_merk || undefined,
-              description: ag.keterangan || undefined,
-            });
+        const targetLeadId = String(contract.lead_id || lead?._id || '');
+
+        if (isCertificateProduct && targetLeadId) {
+          const allFiles = await db
+            .collection<any>('files')
+            .find({ ref_id: targetLeadId })
+            .sort({ create_dtm: -1 })
+            .toArray();
+
+          const agunanFiles: DebtorCollateralFile[] = [];
+
+          for (const f of allFiles) {
+            if (isAgunanFile(f)) {
+              const { category, categoryLabel } = categorizeAgunanFile(f);
+              const coords = f.location?.coordinates;
+              const lng = Array.isArray(coords) && typeof coords[0] === 'number' ? coords[0] : null;
+              const lat = Array.isArray(coords) && typeof coords[1] === 'number' ? coords[1] : null;
+
+              agunanFiles.push({
+                id: String(f._id),
+                name: String(f.name || 'Dokumen Agunan'),
+                category,
+                categoryLabel,
+                notes: f.notes ? String(f.notes) : null,
+                path: String(f.path || ''),
+                from: f.from ? String(f.from) : undefined,
+                latitude: lat,
+                longitude: lng,
+                createdAt: f.create_dtm ? new Date(f.create_dtm).toISOString() : undefined,
+              });
+            }
           }
-        }
-        if (Array.isArray(lead?.agunan)) {
-          for (const ag of lead.agunan) {
-            collaterals.push({
-              unitName: ag.unit_name || ag.jenis || 'Agunan',
-              certificateType: ag.certificate_type || ag.tipe_sertifikat || undefined,
-              taksasi: Number(ag.taksasi || ag.nilai_pasar) || undefined,
-              location: ag.lokasi || ag.alamat || undefined,
-              typeMerk: ag.type_merk || ag.merk || undefined,
-              description: ag.keterangan || undefined,
-            });
+
+          let unitName = 'Agunan Sertifikat Properti (Tanah & Bangunan)';
+          let certType = certsList.join(' / ') || 'SHM / SHGB';
+          let taksasi = 0;
+          let loc = '';
+
+          if (Array.isArray(contract.detail_agunan) && contract.detail_agunan.length > 0) {
+            const ag0 = contract.detail_agunan[0];
+            if (ag0.unit_name) unitName = ag0.unit_name;
+            if (ag0.certificate_type) certType = ag0.certificate_type;
+            if (ag0.taksasi) taksasi = Number(ag0.taksasi) || 0;
+            if (ag0.city_province) loc = ag0.city_province;
           }
+
+          const surveyWithGps = agunanFiles.find((af) => af.latitude && af.longitude);
+          if (!loc && surveyWithGps) {
+            loc = `Koordinat GPS: ${surveyWithGps.latitude}, ${surveyWithGps.longitude}`;
+          }
+
+          collaterals.push({
+            unitName,
+            certificateType: certType,
+            taksasi: taksasi > 0 ? taksasi : undefined,
+            location: loc || undefined,
+            leadId: targetLeadId,
+            description: `Data agunan terhubung dengan collection files MongoDB (ref_id: ${targetLeadId})`,
+            files: agunanFiles,
+          });
         }
 
         // ── 9. Kapasitas Kredit ──────────────────────────────────────
@@ -495,7 +645,9 @@ export async function GET(
             accountNumber,
             debiturCif: contract.lead_id ? String(contract.lead_id) : String(contract._id),
             debiturName,
-            productName: plafon > 15000000 ? 'Pinjaman Sertifikat' : 'Pembiayaan Mikro UMI',
+            productName: isCertificateProduct
+              ? (lead?.pengajuan?.product?.product_name || 'Pinjaman Sertifikat')
+              : 'Pembiayaan Mikro UMI',
             plafon,
             bakiDebetPokok,
             saldoTitipan,
@@ -520,6 +672,9 @@ export async function GET(
           collaterals,
           creditCapacity,
           otherContracts,
+          productCategory,
+          isUmiProduct,
+          isCertificateProduct,
         };
 
         return NextResponse.json({ success: true, data: responseData });
@@ -671,6 +826,9 @@ export async function GET(
         saldoTitipan: Number(loanAccount.saldoTitipan),
       },
       otherContracts,
+      productCategory: 'UMI',
+      isUmiProduct: true,
+      isCertificateProduct: false,
     };
 
     return NextResponse.json({ success: true, data: response });
