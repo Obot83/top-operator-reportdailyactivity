@@ -36,6 +36,7 @@ import type { DebiturControllerData, VisitLogEntry, PTPTrackingData } from '@/sh
 import { formatRupiah, formatDate, getDpdBadgeVariant, getKolektibilitasLabel } from '@/lib/formatters';
 import { VisitTimelineItem } from '@/components/debitur/VisitTimelineItem';
 import { PTPTable } from '@/components/debitur/PTPTable';
+import { CollateralGallery } from '@/components/debitur/CollateralGallery';
 
 async function fetchControllerData(accountNumber: string): Promise<DebiturControllerData> {
   const res = await fetch(`/api/debitur/${accountNumber}/controller`);
@@ -652,65 +653,8 @@ export default function DebiturControllerPage() {
 
                         {/* Berkas & Foto Agunan dari Collection files */}
                         {c.files && c.files.length > 0 && (
-                          <div className="space-y-2 pt-1">
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold text-xs text-foreground flex items-center gap-1">
-                                <Camera className="h-3.5 w-3.5 text-primary" /> Berkas Dokumen & Foto Agunan ({c.files.length} file)
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">Sumber: collection files</span>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {c.files.map((file) => (
-                                <div
-                                  key={file.id}
-                                  className="rounded-lg border border-border/70 bg-card p-2.5 space-y-1 hover:border-primary/40 transition-colors shadow-xs"
-                                >
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="font-semibold text-foreground text-[11px] truncate" title={file.name}>
-                                      {file.name}
-                                    </span>
-                                    <span
-                                      className={`text-[9px] px-1.5 py-0.2 rounded font-semibold shrink-0 ${
-                                        file.category === 'SERTIFIKAT'
-                                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30'
-                                          : file.category === 'SURVEY_LOKASI'
-                                          ? 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30'
-                                          : 'bg-muted text-muted-foreground border border-border'
-                                      }`}
-                                    >
-                                      {file.categoryLabel.split(' ')[0]}
-                                    </span>
-                                  </div>
-
-                                  {file.notes && (
-                                    <p className="text-[10px] text-muted-foreground font-mono bg-muted/40 px-1 py-0.2 rounded w-fit">
-                                      Keterangan: {file.notes}
-                                    </p>
-                                  )}
-
-                                  <div className="text-[10px] text-muted-foreground font-mono truncate" title={file.path}>
-                                    {file.path}
-                                  </div>
-
-                                  {file.latitude && file.longitude && (
-                                    <div className="pt-0.5 flex items-center justify-between text-[10px]">
-                                      <span className="text-muted-foreground font-mono">
-                                        GPS: {file.latitude.toFixed(5)}, {file.longitude.toFixed(5)}
-                                      </span>
-                                      <a
-                                        href={`https://www.google.com/maps?q=${file.latitude},${file.longitude}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-0.5 text-primary hover:underline font-medium"
-                                      >
-                                        Buka Maps <ExternalLink className="h-2.5 w-2.5" />
-                                      </a>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                          <div className="pt-2">
+                            <CollateralGallery files={c.files} leadId={c.leadId} />
                           </div>
                         )}
                       </div>

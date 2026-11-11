@@ -127,6 +127,7 @@ export interface DebtorCollateralFile {
   categoryLabel: string;
   notes?: string | null;
   path: string;
+  url?: string;
   from?: string;
   latitude?: number | null;
   longitude?: number | null;

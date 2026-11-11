@@ -529,6 +529,8 @@ export async function GET(
             .sort({ create_dtm: -1 })
             .toArray();
 
+          const storageBaseUrl = (process.env.STORAGE_PUBLIC_URL || '').trim().replace(/\/$/, '');
+          const isConfiguredStorage = Boolean(storageBaseUrl && !storageBaseUrl.includes('xxxxx'));
           const agunanFiles: DebtorCollateralFile[] = [];
 
           for (const f of allFiles) {
@@ -537,6 +539,12 @@ export async function GET(
               const coords = f.location?.coordinates;
               const lng = Array.isArray(coords) && typeof coords[0] === 'number' ? coords[0] : null;
               const lat = Array.isArray(coords) && typeof coords[1] === 'number' ? coords[1] : null;
+              const rawPath = String(f.path || '');
+              const fileUrl = rawPath.startsWith('http')
+                ? rawPath
+                : isConfiguredStorage
+                ? `${storageBaseUrl}/${rawPath.replace(/^\//, '')}`
+                : `/api/files?path=${encodeURIComponent(rawPath)}`;
 
               agunanFiles.push({
                 id: String(f._id),
@@ -544,7 +552,8 @@ export async function GET(
                 category,
                 categoryLabel,
                 notes: f.notes ? String(f.notes) : null,
-                path: String(f.path || ''),
+                path: rawPath,
+                url: fileUrl,
                 from: f.from ? String(f.from) : undefined,
                 latitude: lat,
                 longitude: lng,
