@@ -73,6 +73,100 @@ export interface PTPTrackingData {
   createdAt: string;
 }
 
+export interface DebtorCustomerDetail {
+  nik: string;
+  name: string;
+  title?: string;
+  phone: string;
+  birthPlace?: string;
+  birthDate?: string;
+  age?: number;
+  gender?: string;
+  religion?: string;
+  maritalStatus?: string;
+  dependentsCount?: number;
+  occupation?: string;
+  motherName?: string;
+  ktpAddress?: string;
+  domisiliAddress?: string;
+  rtRw?: string;
+  subdistrict?: string;
+  district?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
+}
+
+export interface DebtorSpouseDetail {
+  hasSpouse: boolean;
+  name?: string;
+  nik?: string;
+  birthPlace?: string;
+  birthDate?: string;
+  phone?: string;
+  occupation?: string;
+  religion?: string;
+  address?: string;
+}
+
+export interface DebtorGuarantorDetail {
+  id?: string;
+  name: string;
+  relation: string;
+  nik?: string;
+  phone?: string;
+  occupation?: string;
+  address?: string;
+  ktpPhotoUrl?: string;
+}
+
+export interface DebtorCollateralDetail {
+  unitName: string;
+  certificateType?: string;
+  taksasi?: number;
+  location?: string;
+  typeMerk?: string;
+  description?: string;
+}
+
+export interface DebtorCreditCapacity {
+  plafonPengajuan: number;
+  tenorPengajuan: number;
+  tenorType: string;
+  paketName?: string;
+  loanPurpose?: string;
+  scoringGrade?: string;
+  surveyorRecommendation?: {
+    status?: string;
+    plafon?: number;
+    tenor?: number;
+    keterangan?: string;
+    officerName?: string;
+  };
+  analystRecommendation?: {
+    status?: string;
+    plafon?: number;
+    tenor?: number;
+    keterangan?: string;
+    analystName?: string;
+  };
+  angsuranEstimasi?: number;
+  saldoTitipan?: number;
+}
+
+export interface DebtorOtherContractItem {
+  accountNumber: string;
+  productName: string;
+  contractDate: string;
+  plafon: number;
+  bakiDebetPokok: number;
+  tenor: number;
+  dpd: number;
+  kolektibilitas: Kolektibilitas;
+  status: string;
+  isCurrent: boolean;
+}
+
 export interface DebiturControllerData {
   debitur: {
     id?: string;
@@ -112,6 +206,12 @@ export interface DebiturControllerData {
   latestPTP: PTPTrackingData | null;
   visitTimeline: VisitLogEntry[];
   ptpHistory: PTPTrackingData[];
+  customerDetail?: DebtorCustomerDetail;
+  spouse?: DebtorSpouseDetail;
+  guarantors?: DebtorGuarantorDetail[];
+  collaterals?: DebtorCollateralDetail[];
+  creditCapacity?: DebtorCreditCapacity;
+  otherContracts?: DebtorOtherContractItem[];
 }
 
 // ─────────────────────────────────────────────

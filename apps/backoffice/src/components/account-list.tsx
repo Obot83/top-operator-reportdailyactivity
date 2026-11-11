@@ -114,12 +114,12 @@ export function AccountList({
           {/* Pencarian */}
           <div className="lg:col-span-2">
             <label className="mb-1 block text-xs font-semibold text-muted-foreground flex items-center gap-1">
-              <Search className="h-3 w-3" /> Cari Rekening / Debitur / No. HP
+              <Search className="h-3 w-3" /> Cari NIK / Debitur / No. Kontrak / HP
             </label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Cari no. kontrak, nama debitur, CIF, HP..."
+                placeholder="Cari NIK, nama debitur, no. kontrak, CIF, HP..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -212,11 +212,11 @@ export function AccountList({
 
       {/* ── KPI Summary Cards ───────────────────────────────── */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Rekening */}
+        {/* Total Debitur NIK */}
         <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400">
-              Total Rekening
+              Total Debitur (NIK)
             </span>
             <span className="rounded-full bg-blue-500/10 p-1.5 text-blue-600 dark:text-blue-400">
               <CreditCard className="h-4 w-4" />
@@ -224,10 +224,10 @@ export function AccountList({
           </div>
           <p className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-blue-950 dark:text-blue-200">
             {summary?.totalAccounts ?? 0}
-            <span className="text-sm font-normal text-muted-foreground ml-1">kontrak</span>
+            <span className="text-sm font-normal text-muted-foreground ml-1">debitur</span>
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Terdaftar di database operasional
+            Daftar unik NIK (Pengajuan terbaru)
           </p>
         </div>
 
@@ -308,8 +308,9 @@ export function AccountList({
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-3">No. Rekening / Kontrak</th>
-                  <th className="px-4 py-3">Nama Debitur</th>
+                  <th className="px-4 py-3">No. Rekening (Terbaru)</th>
+                  <th className="px-4 py-3">Nama & NIK Debitur</th>
+                  <th className="px-4 py-3">Riwayat Kontrak</th>
                   <th className="px-4 py-3">Kolektor Lapangan</th>
                   <th className="px-4 py-3">Cabang</th>
                   <th className="px-4 py-3 text-right">Plafon</th>
@@ -334,11 +335,36 @@ export function AccountList({
                         <p className="text-[10px] text-muted-foreground">{acc.contractDate}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={detailHref} className="font-semibold text-foreground hover:underline">
-                          {acc.debitur.name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground font-mono">{acc.debitur.phone}</p>
-                        <p className="text-[11px] text-muted-foreground truncate max-w-xs">{acc.debitur.address}</p>
+                        <div className="flex flex-col gap-0.5">
+                          <Link href={detailHref} className="font-semibold text-foreground hover:underline">
+                            {acc.debitur.name}
+                          </Link>
+                          {acc.debitur.nik && acc.debitur.nik !== '-' ? (
+                            <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-foreground w-fit font-medium">
+                              <span className="text-[10px] text-muted-foreground font-sans">NIK:</span> {acc.debitur.nik}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">NIK belum terdaftar</span>
+                          )}
+                          <p className="text-xs text-muted-foreground font-mono">{acc.debitur.phone}</p>
+                          <p className="text-[11px] text-muted-foreground truncate max-w-xs">{acc.debitur.address}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {acc.totalContracts > 1 ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-xs font-semibold text-purple-600 dark:text-purple-400 w-fit">
+                              {acc.totalContracts} Kontrak
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {acc.activeContractsCount} Aktif{acc.closedContractsCount > 0 ? `, ${acc.closedContractsCount} Lunas` : ''}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                            1 Kontrak
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-medium text-foreground">{acc.collector.name}</span>

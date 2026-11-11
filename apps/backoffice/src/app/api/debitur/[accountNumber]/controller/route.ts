@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDb } from '@/lib/mongodb';
 import { prisma } from '@/lib/prisma';
-import type { DebiturControllerData, RiskScore, VisitLogEntry, PTPTrackingData, ApiResponse } from '@/shared/types';
+import type {
+  DebiturControllerData,
+  RiskScore,
+  VisitLogEntry,
+  PTPTrackingData,
+  ApiResponse,
+  DebtorCustomerDetail,
+  DebtorSpouseDetail,
+  DebtorGuarantorDetail,
+  DebtorCollateralDetail,
+  DebtorCreditCapacity,
+  DebtorOtherContractItem,
+} from '@/shared/types';
 
 function calculateRiskScore(params: {
   dpd: number;
@@ -83,20 +95,103 @@ export async function GET(
       const contract = await db.collection<any>('contract').findOne({ _id: accountNumber });
 
       if (contract) {
-        // Ambil data leads terkait jika ada lead_id
+        // Ambil data leads terkait jika ada lead_id atau cocok nama pemohon
         let lead: any = null;
         if (contract.lead_id) {
           lead = await db.collection<any>('leads').findOne({ _id: contract.lead_id });
         }
+        if (!lead && contract.debitur?.name) {
+          lead = await db.collection<any>('leads').findOne({ 'pemohon.name': contract.debitur.name });
+        }
 
-        // Ambil riwayat pembayaran dari v_backoffice_kolektor_angsuran_tertagih_list
+        const nik = String(lead?.pemohon?.ktp?.identity_number || contract.debitur?.nik || '');
+
+        // ── Temukan Seluruh Kontrak Lainnya untuk Debitur / NIK ini ─────
+        const relatedQuery: any[] = [];
+        if (nik) {
+          const relatedLeads = await db
+            .collection('leads')
+            .find({ 'pemohon.ktp.identity_number': nik }, { projection: { _id: 1 } })
+            .toArray();
+          const relatedLeadIds = relatedLeads.map((l) => l._id);
+          if (relatedLeadIds.length > 0) {
+            relatedQuery.push({ lead_id: { $in: relatedLeadIds } });
+          }
+        }
+        if (contract.debitur?.name) {
+          relatedQuery.push({ 'debitur.name': contract.debitur.name });
+        }
+        if (lead?.pemohon?.name && lead.pemohon.name !== contract.debitur?.name) {
+          relatedQuery.push({ 'debitur.name': lead.pemohon.name });
+        }
+        if (contract.lead_id) {
+          relatedQuery.push({ lead_id: contract.lead_id });
+        }
+
+        const rawOtherContracts = await db
+          .collection<any>('contract')
+          .find(relatedQuery.length > 0 ? { $or: relatedQuery } : ({ _id: accountNumber } as any))
+          .sort({ contract_date: -1 })
+          .toArray();
+
+        // Hindari duplikasi jika ada query or yang tumpang tindih
+        const uniqueContractMap = new Map<string, any>();
+        for (const oc of rawOtherContracts) {
+          uniqueContractMap.set(String(oc._id), oc);
+        }
+        // Pastikan kontrak saat ini masuk
+        if (!uniqueContractMap.has(String(contract._id))) {
+          uniqueContractMap.set(String(contract._id), contract);
+        }
+
+        const otherContracts: DebtorOtherContractItem[] = Array.from(uniqueContractMap.values())
+          .map((oc: any) => {
+            let ocBakiDebet = 0;
+            let ocMaxDpd = 0;
+            if (Array.isArray(oc.amortisasi)) {
+              for (const a of oc.amortisasi) {
+                const pokok = Number(a.pokok) || 0;
+                const pokokDibayar = Number(a.pokok_dibayar) || 0;
+                if (!a.payment_date && pokok > pokokDibayar) {
+                  ocBakiDebet += pokok - pokokDibayar;
+                }
+                const telat = Number(a.hari_telat_bayar) || 0;
+                if (telat > ocMaxDpd) ocMaxDpd = telat;
+              }
+            } else {
+              ocBakiDebet = Number(oc.loan?.nominal_pengajuan) || 0;
+            }
+
+            const ocPlafon = Number(oc.loan?.nominal_pengajuan) || ocBakiDebet;
+            const ocTenor = Number(oc.loan?.tenor) || 30;
+
+            return {
+              accountNumber: String(oc._id),
+              productName: ocPlafon > 15000000 ? 'Pinjaman Sertifikat' : 'Pembiayaan Mikro UMI',
+              contractDate: oc.contract_date ? new Date(oc.contract_date).toISOString().slice(0, 10) : '-',
+              plafon: ocPlafon,
+              bakiDebetPokok: ocBakiDebet,
+              tenor: ocTenor,
+              dpd: ocMaxDpd,
+              kolektibilitas: calculateKolektibilitas(ocMaxDpd),
+              status: String(oc.status_kontrak ?? 'AKTIF'),
+              isCurrent: String(oc._id) === accountNumber,
+            };
+          })
+          .sort((a, b) => {
+            if (a.isCurrent) return -1;
+            if (b.isCurrent) return 1;
+            return new Date(b.contractDate).getTime() - new Date(a.contractDate).getTime();
+          });
+
+        // ── Data Riwayat Pembayaran & Kunjungan ────────────────────────
         const payments = await db
           .collection('v_backoffice_kolektor_angsuran_tertagih_list')
           .find({ contract_id: accountNumber })
           .sort({ tgl_bayar: -1 })
           .toArray();
 
-        // Hitung amortisasi & baki debet
+        // Hitung amortisasi & baki debet kontrak aktif
         let bakiDebetPokok = 0;
         let maxDpd = 0;
         let angsuranPokok = 0;
@@ -169,7 +264,8 @@ export async function GET(
 
         const debiturName = String(contract.debitur?.name || lead?.pemohon?.name || 'Tanpa Nama');
         const phone = String(contract.debitur?.no_hp || lead?.pemohon?.phone_number || '-');
-        const nik = String(lead?.pemohon?.ktp?.identity_number || '-');
+        const resolvedNik = String(nik || '-');
+
         const address = [
           contract.alamat?.alamat,
           contract.alamat?.kelurahan,
@@ -180,12 +276,213 @@ export async function GET(
           .filter(Boolean)
           .join(', ') || 'Alamat Belum Terdaftar';
 
+        // ── 5. Data Detail Nasabah ───────────────────────────────────
+        const pemohon = lead?.pemohon;
+        const ktp = pemohon?.ktp;
+        const domisili = pemohon?.domisili;
+
+        let age: number | undefined = undefined;
+        if (ktp?.birth_date) {
+          const bDate = new Date(ktp.birth_date);
+          if (!isNaN(bDate.getTime())) {
+            const diffMs = Date.now() - bDate.getTime();
+            age = Math.floor(diffMs / (365.25 * 24 * 3600 * 1000));
+          }
+        }
+
+        const ktpAddressParts = [
+          ktp?.address,
+          ktp?.rt ? `RT ${ktp.rt}` : '',
+          ktp?.rw ? `RW ${ktp.rw}` : '',
+          ktp?.subdistricts?.name || (typeof ktp?.subdistricts === 'string' ? ktp.subdistricts : ''),
+          ktp?.districts,
+          ktp?.city,
+          ktp?.province,
+          ktp?.postal_code ? `Kode Pos ${ktp.postal_code}` : '',
+        ].filter(Boolean);
+
+        const domisiliAddressParts = [
+          domisili?.address || address,
+          domisili?.rt ? `RT ${domisili.rt}` : '',
+          domisili?.rw ? `RW ${domisili.rw}` : '',
+          domisili?.subdistricts?.name || (typeof domisili?.subdistricts === 'string' ? domisili.subdistricts : ''),
+          domisili?.districts,
+          domisili?.city,
+          domisili?.province,
+          domisili?.postal_code ? `Kode Pos ${domisili.postal_code}` : '',
+        ].filter(Boolean);
+
+        const customerDetail: DebtorCustomerDetail = {
+          nik: resolvedNik,
+          name: debiturName,
+          title: pemohon?.title?.name || undefined,
+          phone,
+          birthPlace: ktp?.birth_place || undefined,
+          birthDate: ktp?.birth_date ? new Date(ktp.birth_date).toISOString().slice(0, 10) : undefined,
+          age,
+          gender:
+            ktp?.gender?.name ||
+            pemohon?.gender?.name ||
+            (ktp?.gender?.id === 'L' ? 'Laki-laki' : ktp?.gender?.id === 'P' ? 'Perempuan' : undefined),
+          religion: ktp?.religion?.name || undefined,
+          maritalStatus: ktp?.marital?.name || pemohon?.marital?.name || undefined,
+          dependentsCount: typeof pemohon?.jumlah_tanggungan === 'number' ? pemohon.jumlah_tanggungan : undefined,
+          occupation: pemohon?.pekerjaan?.name || (typeof pemohon?.pekerjaan === 'string' ? pemohon.pekerjaan : undefined),
+          motherName: pemohon?.mother_name || pemohon?.nama_gadis_ibu_kandung || undefined,
+          ktpAddress: ktpAddressParts.join(', ') || undefined,
+          domisiliAddress: domisiliAddressParts.join(', ') || address,
+          rtRw: ktp?.rt && ktp?.rw ? `${ktp.rt} / ${ktp.rw}` : undefined,
+          subdistrict: ktp?.subdistricts?.name || (typeof ktp?.subdistricts === 'string' ? ktp.subdistricts : undefined),
+          district: ktp?.districts || undefined,
+          city: ktp?.city || undefined,
+          province: ktp?.province || undefined,
+          postalCode: ktp?.postal_code ? String(ktp.postal_code) : undefined,
+        };
+
+        // ── 6. Data Pasangan ─────────────────────────────────────────
+        const sp = lead?.spouse;
+        const spKtp = sp?.ktp;
+        const hasSpouse = Boolean(sp?.name || spKtp?.identity_number);
+        const spouseAddressParts = [
+          spKtp?.address,
+          spKtp?.rt ? `RT ${spKtp.rt}` : '',
+          spKtp?.rw ? `RW ${spKtp.rw}` : '',
+          spKtp?.subdistricts?.name || (typeof spKtp?.subdistricts === 'string' ? spKtp.subdistricts : ''),
+          spKtp?.districts,
+          spKtp?.city,
+          spKtp?.province,
+        ].filter(Boolean);
+
+        const spouse: DebtorSpouseDetail = {
+          hasSpouse,
+          name: sp?.name || undefined,
+          nik: spKtp?.identity_number || undefined,
+          birthPlace: spKtp?.birth_place || undefined,
+          birthDate: spKtp?.birth_date ? new Date(spKtp.birth_date).toISOString().slice(0, 10) : undefined,
+          phone: sp?.phone_number || undefined,
+          occupation: sp?.pekerjaan?.name || (typeof sp?.pekerjaan === 'string' ? sp.pekerjaan : undefined),
+          religion: spKtp?.religion?.name || sp?.religion?.name || undefined,
+          address: spouseAddressParts.join(', ') || undefined,
+        };
+
+        // ── 7. Data Penjamin (LEC / Guarantor) ────────────────────────
+        const guarantors: DebtorGuarantorDetail[] = [];
+        if (Array.isArray(lead?.lec)) {
+          for (const item of lead.lec) {
+            const itemKtp = item.ktp;
+            const addr = [
+              itemKtp?.address,
+              itemKtp?.rt ? `RT ${itemKtp.rt}` : '',
+              itemKtp?.rw ? `RW ${itemKtp.rw}` : '',
+              itemKtp?.subdistricts?.name || (typeof itemKtp?.subdistricts === 'string' ? itemKtp.subdistricts : ''),
+              itemKtp?.districts,
+              itemKtp?.city,
+              itemKtp?.province,
+            ]
+              .filter(Boolean)
+              .join(', ');
+
+            guarantors.push({
+              id: String(item.id || itemKtp?.identity_number || ''),
+              name: String(item.name || 'Penjamin'),
+              relation: String(item.relation || 'PENJAMIN / KONTAK DARURAT'),
+              nik: itemKtp?.identity_number || undefined,
+              phone: item.phone_number || undefined,
+              occupation: item.pekerjaan?.name || (typeof item.pekerjaan === 'string' ? item.pekerjaan : undefined),
+              address: addr || undefined,
+              ktpPhotoUrl: item.path || undefined,
+            });
+          }
+        }
+        if (lead?.penjamin && !guarantors.some((g) => g.name === lead.penjamin.name)) {
+          guarantors.push({
+            name: lead.penjamin.name,
+            relation: lead.penjamin.hubungan || 'PENJAMIN',
+            nik: lead.penjamin.nik || undefined,
+            phone: lead.penjamin.phone || lead.penjamin.no_hp || undefined,
+            occupation: lead.penjamin.pekerjaan || undefined,
+            address: lead.penjamin.alamat || undefined,
+          });
+        }
+
+        // ── 8. Data Agunan ───────────────────────────────────────────
+        const collaterals: DebtorCollateralDetail[] = [];
+        if (Array.isArray(contract.detail_agunan)) {
+          for (const ag of contract.detail_agunan) {
+            collaterals.push({
+              unitName: ag.unit_name || 'Agunan Properti / Sertifikat',
+              certificateType: ag.certificate_type || undefined,
+              taksasi: Number(ag.taksasi) || undefined,
+              location: ag.city_province || undefined,
+              typeMerk: ag.type_merk || undefined,
+              description: ag.keterangan || undefined,
+            });
+          }
+        }
+        if (Array.isArray(lead?.agunan)) {
+          for (const ag of lead.agunan) {
+            collaterals.push({
+              unitName: ag.unit_name || ag.jenis || 'Agunan',
+              certificateType: ag.certificate_type || ag.tipe_sertifikat || undefined,
+              taksasi: Number(ag.taksasi || ag.nilai_pasar) || undefined,
+              location: ag.lokasi || ag.alamat || undefined,
+              typeMerk: ag.type_merk || ag.merk || undefined,
+              description: ag.keterangan || undefined,
+            });
+          }
+        }
+
+        // ── 9. Kapasitas Kredit ──────────────────────────────────────
+        const pengajuan = lead?.pengajuan;
+        const submissionLoan =
+          Number(pengajuan?.submission?.loan?.$numberDecimal || pengajuan?.submission?.loan) || plafon;
+        const submissionTenor = Number(pengajuan?.submission?.tenor) || tenor;
+        const submissionTenorType =
+          pengajuan?.submission?.tenor_type_name || pengajuan?.product?.tenor_type || 'MINGGU';
+
+        const surveyorRec = lead?.rekomendasi?.surveyor;
+        const analystRec = lead?.rekomendasi?.credit_analyst;
+
+        const creditCapacity: DebtorCreditCapacity = {
+          plafonPengajuan: submissionLoan,
+          tenorPengajuan: submissionTenor,
+          tenorType: submissionTenorType,
+          paketName: pengajuan?.product?.paket_name || undefined,
+          loanPurpose: pengajuan?.loan_purpose?.name || undefined,
+          scoringGrade:
+            typeof lead?.scoring_grade === 'string'
+              ? lead.scoring_grade
+              : lead?.scoring_grade?.grade || undefined,
+          surveyorRecommendation: surveyorRec
+            ? {
+                status: surveyorRec.status || undefined,
+                plafon:
+                  Number(surveyorRec.submission?.loan?.$numberDecimal || surveyorRec.submission?.loan) || undefined,
+                tenor: Number(surveyorRec.submission?.tenor) || undefined,
+                keterangan: surveyorRec.keterangan || undefined,
+                officerName: surveyorRec.by || undefined,
+              }
+            : undefined,
+          analystRecommendation: analystRec
+            ? {
+                status: analystRec.status || undefined,
+                plafon:
+                  Number(analystRec.submission?.loan?.$numberDecimal || analystRec.submission?.loan) || undefined,
+                tenor: Number(analystRec.submission?.tenor) || undefined,
+                keterangan: analystRec.keterangan || undefined,
+                analystName: analystRec.by || undefined,
+              }
+            : undefined,
+          angsuranEstimasi: angsuranPokok + angsuranBunga,
+          saldoTitipan,
+        };
+
         const responseData: DebiturControllerData = {
           debitur: {
             id: String(contract._id),
             cif: contract.lead_id ? String(contract.lead_id) : String(contract._id),
             name: debiturName,
-            nik,
+            nik: resolvedNik,
             phone,
             gender: lead?.pemohon?.ktp?.gender?.name ?? 'P',
             domisiliAddress: address,
@@ -217,6 +514,12 @@ export async function GET(
           latestPTP,
           visitTimeline,
           ptpHistory,
+          customerDetail,
+          spouse,
+          guarantors,
+          collaterals,
+          creditCapacity,
+          otherContracts,
         };
 
         return NextResponse.json({ success: true, data: responseData });
@@ -280,6 +583,25 @@ export async function GET(
       visitLogs,
     });
 
+    // Cari rekening lain di MySQL Prisma untuk debitur ini
+    const prismaOtherLoans = await prisma.loanAccount.findMany({
+      where: { debiturCif: loanAccount.debiturCif },
+      orderBy: { tanggalAkad: 'desc' },
+    });
+
+    const otherContracts: DebtorOtherContractItem[] = prismaOtherLoans.map((pl) => ({
+      accountNumber: pl.accountNumber,
+      productName: pl.productName,
+      contractDate: pl.tanggalAkad.toISOString().slice(0, 10),
+      plafon: Number(pl.plafon),
+      bakiDebetPokok: Number(pl.bakiDebetPokok),
+      tenor: pl.tenorMinggu,
+      dpd: pl.dpd,
+      kolektibilitas: pl.kolektibilitas as any,
+      status: pl.isActive ? 'AKTIF' : 'LUNAS',
+      isCurrent: pl.accountNumber === accountNumber,
+    }));
+
     const response: DebiturControllerData = {
       debitur: {
         cif: loanAccount.debitur.cif,
@@ -330,6 +652,25 @@ export async function GET(
         createdAt: p.createdAt.toISOString(),
       })),
       riskScore,
+      customerDetail: {
+        nik: loanAccount.debitur.nik,
+        name: loanAccount.debitur.name,
+        phone: loanAccount.debitur.phone ?? '-',
+        domisiliAddress: loanAccount.debitur.domisiliAddress,
+        district: loanAccount.debitur.domisiliKecamatan,
+        city: loanAccount.debitur.domisiliKota,
+      },
+      spouse: { hasSpouse: false },
+      guarantors: [],
+      collaterals: [],
+      creditCapacity: {
+        plafonPengajuan: Number(loanAccount.plafon),
+        tenorPengajuan: loanAccount.tenorMinggu,
+        tenorType: 'MINGGU',
+        angsuranEstimasi: Number(loanAccount.totalAngsuran),
+        saldoTitipan: Number(loanAccount.saldoTitipan),
+      },
+      otherContracts,
     };
 
     return NextResponse.json({ success: true, data: response });
