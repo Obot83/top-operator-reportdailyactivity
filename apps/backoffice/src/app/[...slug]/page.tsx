@@ -1,8 +1,15 @@
 import { notFound } from 'next/navigation';
 import { findMenuItem } from '@/lib/menu';
 
+export const dynamic = 'force-dynamic';
+
 export default function MenuModulePage({ params }: { params: { slug: string[] } }) {
-  const item = findMenuItem(`/${params.slug.join('/')}`);
+  const slug = params?.slug || [];
+  if (slug.length === 0 || slug[0].startsWith('_') || slug[0] === 'api') {
+    notFound();
+  }
+
+  const item = findMenuItem(`/${slug.join('/')}`);
   if (!item) notFound();
 
   return (

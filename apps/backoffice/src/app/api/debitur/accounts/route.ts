@@ -3,6 +3,8 @@ import { getMongoDb } from '@/lib/mongodb';
 import { prisma } from '@/lib/prisma';
 import type { ApiResponse } from '@/shared/types';
 
+export const dynamic = 'force-dynamic';
+
 export type DebiturAccountItem = {
   accountNumber: string;
   debitur: {

@@ -6,6 +6,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { ApiResponse } from '@/shared/types';
 import { uploadPhotoToStorage } from '@/lib/storage';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<unknown>>> {
   try {
     const formData = await req.formData();
