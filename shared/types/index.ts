@@ -152,12 +152,31 @@ export interface DebtorCreditCapacity {
   paketName?: string;
   loanPurpose?: string;
   scoringGrade?: string;
+  tanggalPengajuan?: string;
+  aoName?: string;
+  aoUsername?: string;
+  officersSummary?: {
+    salesAo?: string;
+    surveyor?: string;
+    creditAnalyst?: string;
+    approvalKomite?: string;
+  };
+  slikChecking?: {
+    status?: string;
+    tanggalPengecekan?: string;
+    officerName?: string;
+    officerUsername?: string;
+    cbiScore?: string | number;
+    keterangan?: string;
+  };
   surveyorRecommendation?: {
     status?: string;
     plafon?: number;
     tenor?: number;
     keterangan?: string;
     officerName?: string;
+    officerUsername?: string;
+    tanggalSurvey?: string;
   };
   analystRecommendation?: {
     status?: string;
@@ -165,9 +184,48 @@ export interface DebtorCreditCapacity {
     tenor?: number;
     keterangan?: string;
     analystName?: string;
+    analystUsername?: string;
+    tanggalProses?: string;
+  };
+  komiteRecommendation?: {
+    status?: string;
+    plafon?: number;
+    tenor?: number;
+    keterangan?: string;
+    approverName?: string;
+    approverUsername?: string;
+    tanggalProses?: string;
   };
   angsuranEstimasi?: number;
   saldoTitipan?: number;
+}
+
+export interface DebtorDocumentItem {
+  id: string;
+  name: string;
+  type: 'KTP' | 'KK' | 'BUKU_NIKAH' | 'NPWP' | 'TTD' | 'FOTO_USAHA' | 'FOTO_SURVEY' | 'LAINNYA';
+  typeLabel: string;
+  number?: string;
+  status: 'TERVERIFIKASI' | 'TERLAMPIR' | 'OPSIONAL' | 'BELUM_LENGKAP';
+  url?: string;
+  notes?: string | null;
+  createdAt?: string;
+}
+
+export interface DebtorJobCapacity {
+  occupation: string;
+  businessName?: string;
+  businessType?: string;
+  workPeriod?: string;
+  workAddress?: string;
+  monthlyRevenue?: number;
+  monthlyExpense?: number;
+  netIncome?: number;
+  estimatedInstallment?: number;
+  dsrRatio?: number;
+  dsrCategory?: 'SANGAT_SEHAT' | 'SEHAT' | 'WASPADA' | 'KRITIS';
+  businessPhotoUrl?: string;
+  notes?: string;
 }
 
 export interface DebtorOtherContractItem {
@@ -181,6 +239,7 @@ export interface DebtorOtherContractItem {
   kolektibilitas: Kolektibilitas;
   status: string;
   isCurrent: boolean;
+  creditCapacity?: DebtorCreditCapacity;
 }
 
 export interface DebiturControllerData {
@@ -228,6 +287,8 @@ export interface DebiturControllerData {
   collaterals?: DebtorCollateralDetail[];
   creditCapacity?: DebtorCreditCapacity;
   otherContracts?: DebtorOtherContractItem[];
+  documents?: DebtorDocumentItem[];
+  jobCapacity?: DebtorJobCapacity;
   productCategory?: 'UMI' | 'SERTIFIKAT' | 'LAINNYA';
   isUmiProduct?: boolean;
   isCertificateProduct?: boolean;

@@ -145,27 +145,29 @@ export function AoDailyReport() {
               <Stat label="Titipan muka" value={formatRupiah(summary.totalTitipanMuka)} />
             </div>
             {bookingByAo.length > 0 && (
-              <div className="mt-3 overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead className="border-b bg-muted/40 text-left text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">AO</th>
-                      <th className="px-3 py-2 font-medium">Booking</th>
-                      <th className="px-3 py-2 font-medium">Pencairan</th>
-                      <th className="px-3 py-2 font-medium">Nominal pencairan</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bookingByAo.map((row) => (
-                      <tr key={row.name} className="border-b last:border-0">
-                        <td className="px-3 py-2">{row.name}</td>
-                        <td className="px-3 py-2">{row.booking}</td>
-                        <td className="px-3 py-2">{row.pencairan}</td>
-                        <td className="px-3 py-2 font-mono">{formatRupiah(row.nominal)}</td>
+              <div className="mt-3 overflow-hidden rounded-xl border border-border/80 shadow-2xs bg-card">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-muted/50 border-b border-border/80 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        <th className="px-3.5 py-2.5">AO</th>
+                        <th className="px-3.5 py-2.5 text-center">Booking</th>
+                        <th className="px-3.5 py-2.5 text-center">Pencairan</th>
+                        <th className="px-3.5 py-2.5 text-right">Nominal Pencairan</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {bookingByAo.map((row) => (
+                        <tr key={row.name} className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
+                          <td className="px-3.5 py-2.5 font-medium text-foreground">{row.name}</td>
+                          <td className="px-3.5 py-2.5 text-center font-mono">{row.booking}</td>
+                          <td className="px-3.5 py-2.5 text-center font-mono">{row.pencairan}</td>
+                          <td className="px-3.5 py-2.5 font-mono font-semibold text-right text-foreground tabular-nums">{formatRupiah(row.nominal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </section>
@@ -173,41 +175,47 @@ export function AoDailyReport() {
       )}
 
       {query.data && (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-left text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Waktu</th>
-                <th className="px-3 py-2 font-medium">AO</th>
-                <th className="px-3 py-2 font-medium">Aktivitas</th>
-                <th className="px-3 py-2 font-medium">Nama / rekening</th>
-                <th className="px-3 py-2 font-medium">Nominal</th>
-                <th className="px-3 py-2 font-medium">Check-in</th>
-                <th className="px-3 py-2 font-medium">Catatan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {query.data.activities.length === 0 ? (
+        <div className="overflow-hidden rounded-xl border border-border/80 shadow-2xs bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-muted/50 border-b border-border/80 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                    Tidak ada aktivitas pada tanggal ini.
-                  </td>
+                  <th className="px-3.5 py-3 whitespace-nowrap">Waktu</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">AO</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">Aktivitas</th>
+                  <th className="px-3.5 py-3 whitespace-nowrap">Nama / Rekening</th>
+                  <th className="px-3.5 py-3 text-right whitespace-nowrap">Nominal</th>
+                  <th className="px-3.5 py-3 text-center whitespace-nowrap">Check-in</th>
+                  <th className="px-3.5 py-3">Catatan</th>
                 </tr>
-              ) : query.data.activities.map((activity) => (
-                <tr key={activity.id} className="border-b last:border-0">
-                  <td className="px-3 py-2 whitespace-nowrap">{activity.activityDate ? formatDateTime(activity.activityDate) : '-'}</td>
-                  <td className="px-3 py-2">{activity.aoName ?? selectedAo?.name ?? '-'}</td>
-                  <td className="px-3 py-2">{activity.activityTypeLabel ?? '-'}</td>
-                  <td className="px-3 py-2">{activity.prospekName ?? activity.accountNumber ?? '-'}</td>
-                  <td className="px-3 py-2 font-mono">
-                    {formatRupiah(activity.nominalRealisasi ?? activity.prospekNominalPengajuan ?? activity.nominalTitipanMuka ?? 0)}
-                  </td>
-                  <td className="px-3 py-2">{checkInLabel(activity)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{activity.catatan ?? '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {query.data.activities.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                      Tidak ada aktivitas pada tanggal ini.
+                    </td>
+                  </tr>
+                ) : query.data.activities.map((activity) => (
+                  <tr key={activity.id} className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
+                    <td className="px-3.5 py-2.5 whitespace-nowrap font-mono text-[11px] text-muted-foreground">{activity.activityDate ? formatDateTime(activity.activityDate) : '-'}</td>
+                    <td className="px-3.5 py-2.5 font-medium text-foreground">{activity.aoName ?? selectedAo?.name ?? '-'}</td>
+                    <td className="px-3.5 py-2.5">
+                      <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
+                        {activity.activityTypeLabel ?? '-'}
+                      </span>
+                    </td>
+                    <td className="px-3.5 py-2.5 font-medium text-foreground">{activity.prospekName ?? activity.accountNumber ?? '-'}</td>
+                    <td className="px-3.5 py-2.5 font-mono font-semibold text-right text-foreground tabular-nums">
+                      {formatRupiah(activity.nominalRealisasi ?? activity.prospekNominalPengajuan ?? activity.nominalTitipanMuka ?? 0)}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-center text-[11px] text-muted-foreground">{checkInLabel(activity)}</td>
+                    <td className="px-3.5 py-2.5 text-muted-foreground text-xs">{activity.catatan ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </main>

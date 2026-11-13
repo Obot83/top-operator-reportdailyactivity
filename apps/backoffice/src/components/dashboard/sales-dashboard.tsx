@@ -1,25 +1,18 @@
 'use client';
 
-import { BookOpen, Hourglass, Laptop, TrendingDown, type LucideIcon, BarChart3 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'] as const;
 
-/** Nilai batang biru di grafik. April + Agustus = Rp 8.205.000. */
+/** Nilai batang di grafik. April + Agustus = Rp 8.205.000 (Leads) & Rp 2.050.000 (Prospects). */
 const LEADS_BY_MONTH = [0, 0, 0, 5_600_000, 0, 0, 0, 2_605_000, 0, 0, 0, 0];
 const PROSPECTS_BY_MONTH = [0, 0, 0, 1_200_000, 0, 0, 0, 850_000, 0, 0, 0, 0];
 const Y_MAX = 6_000_000;
 const Y_TICKS = [6_000_000, 5_000_000, 4_000_000, 3_000_000, 2_000_000, 1_000_000, 0];
 
-const LEADS_COLOR = '#2563EB'; // Vibrant Blue
-const PROSPECTS_COLOR = '#F43F5E'; // Rose Pink
-
-function idNumber(value: number) {
-  return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
-function rupiah(value: number) {
-  return `Rp ${idNumber(value)}`;
-}
+const LEADS_COLOR = '#2563eb'; // Vibrant Blue
+const PROSPECTS_COLOR = '#e11d48'; // Elegant Crimson
 
 function rupiahShort(value: number) {
   if (value >= 1_000_000) {
@@ -33,107 +26,136 @@ function rupiahShort(value: number) {
 }
 
 export function SalesDashboard() {
-  const jumlahLeads = LEADS_BY_MONTH.reduce((sum, value) => sum + value, 0);
-  const jumlahProspects = PROSPECTS_BY_MONTH.reduce((sum, value) => sum + value, 0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  const updateScrollProgress = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) {
+      setScrollProgress(0);
+    } else {
+      setScrollProgress(Math.min(100, Math.max(0, (scrollLeft / maxScroll) * 100)));
+    }
+  };
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    updateScrollProgress();
+    el.addEventListener('scroll', updateScrollProgress, { passive: true });
+    window.addEventListener('resize', updateScrollProgress);
+    return () => {
+      el.removeEventListener('scroll', updateScrollProgress);
+      window.removeEventListener('resize', updateScrollProgress);
+    };
+  }, []);
+
+  const handleScrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -260, behavior: 'smooth' });
+    }
+  };
+
+  const handleScrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 260, behavior: 'smooth' });
+    }
+  };
 
   return (
-    <div className="space-y-5">
-      {/* ── Section Grafik Sales ── */}
-      <section className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-blue-100/70 text-blue-600 flex items-center justify-center shrink-0">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">
-                Sales Statistik
+    <div className="w-full">
+      <section className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-card p-6 sm:p-8 shadow-card">
+        {/* ── Top Header & Legend ── */}
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800/80">
+          <div className="max-w-xl">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                Statistik Penyaluran Pembiayaan
               </h2>
-              <p className="text-xs font-medium text-slate-600">
-                Pergerakan nominal Leads dan Prospects sepanjang tahun berjalan
-              </p>
+              <span className="rounded-lg bg-blue-50/80 dark:bg-blue-950/40 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 border border-blue-200/70 dark:border-blue-800/60">
+                Tahun 2026
+              </span>
             </div>
+            <p className="mt-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              Perbandingan nominal Leads dan Prospects yang teregistrasi per bulan.
+            </p>
           </div>
 
-          {/* Legend dengan label kontras tinggi */}
-          <div className="flex items-center gap-5 bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200/70 text-xs font-bold text-slate-800">
-            <span className="inline-flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full shadow-2xs" style={{ background: LEADS_COLOR }} />
-              <span>Leads (Rp 8,2 Jt)</span>
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full shadow-2xs" style={{ background: PROSPECTS_COLOR }} />
-              <span>Prospects (Rp 2,05 Jt)</span>
-            </span>
+          {/* Legend Box */}
+          <div className="flex items-center gap-5 sm:gap-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 px-5 py-3.5 shadow-2xs shrink-0 self-start md:self-auto">
+            <div className="flex items-start gap-2.5">
+              <span className="h-3.5 w-3.5 rounded-xs shrink-0 mt-0.5" style={{ backgroundColor: LEADS_COLOR }} />
+              <div className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 leading-tight">
+                <div>Leads (8,2</div>
+                <div>Jt)</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <span className="h-3.5 w-3.5 rounded-xs shrink-0 mt-0.5" style={{ backgroundColor: PROSPECTS_COLOR }} />
+              <div className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 leading-tight">
+                <div>Prospects (2,05</div>
+                <div>Jt)</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Chart with horizontal scroll wrapper for mobile */}
-        <div className="mt-4 overflow-x-auto pb-2">
-          <div className="min-w-[680px]">
+        {/* ── Responsive SVG Chart ── */}
+        <div
+          ref={scrollContainerRef}
+          className="mt-6 overflow-x-auto pb-2 scrollbar-none"
+        >
+          <div className="min-w-[760px] sm:min-w-full">
             <SalesChart />
           </div>
         </div>
-      </section>
 
-      {/* ── Section Metrics Cards ── */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          icon={BookOpen}
-          iconBg="#EA580C"
-          label="Jumlah Leads"
-          value={rupiah(jumlahLeads)}
-          percent="100%"
-          percentClass="text-emerald-700 font-bold"
-          ratio="2/2 Periode Aktif"
-          tagColor="bg-orange-50 text-orange-700 border-orange-200"
-        />
-        <MetricCard
-          icon={Hourglass}
-          iconBg="#334155"
-          label="Prospects"
-          value={rupiah(jumlahProspects)}
-          percent="25%"
-          percentClass="text-blue-700 font-bold"
-          ratio="Terproses"
-          tagColor="bg-slate-100 text-slate-800 border-slate-200"
-        />
-        <MetricCard
-          icon={Laptop}
-          iconBg="#E11D48"
-          label="Collections"
-          value={rupiah(0)}
-          percent="0%"
-          percentClass="text-rose-700 font-bold"
-          ratio="Rp 0 / Target Rp 0"
-          tagColor="bg-rose-50 text-rose-700 border-rose-200"
-        />
-        <MetricCard
-          icon={TrendingDown}
-          iconBg="#059669"
-          label="NPL (Non-Performing Loan)"
-          value="0.00%"
-          percent="Lancar"
-          percentClass="text-emerald-700 font-bold"
-          ratio="Kolektibilitas 1"
-          tagColor="bg-emerald-50 text-emerald-700 border-emerald-200"
-        />
+        {/* ── Bottom Slider / Scroll Navigation ── */}
+        <div className="mt-6 flex items-center gap-2 px-1 text-slate-400">
+          <button
+            type="button"
+            onClick={handleScrollLeft}
+            aria-label="Geser ke kiri"
+            className="h-6 w-6 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div className="relative flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+            <div
+              className="absolute top-0 bottom-0 rounded-full bg-slate-300 dark:bg-slate-600 transition-all duration-150"
+              style={{
+                width: '32%',
+                left: `${scrollProgress * 0.68}%`,
+              }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleScrollRight}
+            aria-label="Geser ke kanan"
+            className="h-6 w-6 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </section>
     </div>
   );
 }
 
 function SalesChart() {
-  const width = 940;
-  const height = 340;
-  const padL = 90;
-  const padR = 24;
-  const padT = 32;
-  const padB = 40;
+  const width = 1000;
+  const height = 360;
+  const padL = 80;
+  const padR = 28;
+  const padT = 36;
+  const padB = 44;
   const plotW = width - padL - padR;
   const plotH = height - padT - padB;
   const slot = plotW / MONTHS.length;
-  const barW = slot * 0.32;
+  const barW = slot * 0.28;
   const yOf = (value: number) => padT + plotH - (value / Y_MAX) * plotH;
   const baseline = yOf(0);
 
@@ -144,7 +166,7 @@ function SalesChart() {
       role="img"
       aria-label="Grafik leads & prospects bulanan"
     >
-      {/* Horizontal Gridlines & Y-Axis Labels (Dark, High Contrast) */}
+      {/* Horizontal Gridlines & Y-Axis Labels */}
       {Y_TICKS.map((tick) => {
         const y = yOf(tick);
         return (
@@ -154,18 +176,17 @@ function SalesChart() {
               x2={width - padR}
               y1={y}
               y2={y}
-              stroke="#E2E8F0"
+              stroke={tick === 0 ? '#f1f5f9' : '#e2e8f0'}
               strokeWidth={tick === 0 ? '1.5' : '1'}
-              strokeDasharray={tick === 0 ? undefined : '4 4'}
+              strokeDasharray={tick === 0 ? undefined : '3 3'}
             />
-            {/* Y-axis label: high contrast text-slate-700 */}
             <text
               x={padL - 14}
               y={y + 4}
               textAnchor="end"
-              fill="#334155"
-              fontSize="12"
-              fontWeight="700"
+              fill="#64748b"
+              fontSize="11"
+              fontWeight="500"
               fontFamily="ui-sans-serif, system-ui, sans-serif"
             >
               {rupiahShort(tick)}
@@ -174,7 +195,7 @@ function SalesChart() {
         );
       })}
 
-      {/* Vertical separators */}
+      {/* Vertical subtle column separators */}
       {MONTHS.map((month, index) => {
         const x = padL + slot * index;
         return (
@@ -184,12 +205,11 @@ function SalesChart() {
             x2={x}
             y1={padT}
             y2={baseline}
-            stroke="#F1F5F9"
+            stroke="#f8fafc"
             strokeWidth="1"
           />
         );
       })}
-      <line x1={width - padR} x2={width - padR} y1={padT} y2={baseline} stroke="#F1F5F9" strokeWidth="1" />
 
       {/* Bars: Leads & Prospects */}
       {MONTHS.map((month, index) => {
@@ -200,7 +220,7 @@ function SalesChart() {
         const xPros = center + 2;
 
         return (
-          <g key={month}>
+          <g key={month} className="group">
             {/* Leads Bar */}
             {leadsVal > 0 && (
               <g>
@@ -211,24 +231,24 @@ function SalesChart() {
                   height={baseline - yOf(leadsVal)}
                   fill={LEADS_COLOR}
                   rx="4"
-                  className="transition-all duration-300 hover:opacity-90"
+                  className="transition-all duration-200 hover:brightness-110"
                 />
-                {/* Value Label Above Leads Bar */}
+                {/* Pill Tooltip above bar */}
                 <rect
                   x={xLeads - 12}
                   y={yOf(leadsVal) - 22}
                   width={barW + 24}
                   height={18}
-                  fill="#1E293B"
+                  fill="#0f172a"
                   rx="4"
                 />
                 <text
                   x={xLeads + barW / 2}
                   y={yOf(leadsVal) - 9}
                   textAnchor="middle"
-                  fill="#FFFFFF"
+                  fill="#ffffff"
                   fontSize="10"
-                  fontWeight="800"
+                  fontWeight="700"
                   fontFamily="ui-sans-serif, system-ui, sans-serif"
                 >
                   {rupiahShort(leadsVal)}
@@ -246,9 +266,9 @@ function SalesChart() {
                   height={baseline - yOf(prosVal)}
                   fill={PROSPECTS_COLOR}
                   rx="4"
-                  className="transition-all duration-300 hover:opacity-90"
+                  className="transition-all duration-200 hover:brightness-110"
                 />
-                {/* Value Label Above Prospects Bar */}
+                {/* Pill Tooltip above bar */}
                 <rect
                   x={xPros - 10}
                   y={yOf(prosVal) - 22}
@@ -261,9 +281,9 @@ function SalesChart() {
                   x={xPros + barW / 2}
                   y={yOf(prosVal) - 9}
                   textAnchor="middle"
-                  fill="#FFFFFF"
+                  fill="#ffffff"
                   fontSize="10"
-                  fontWeight="800"
+                  fontWeight="700"
                   fontFamily="ui-sans-serif, system-ui, sans-serif"
                 >
                   {rupiahShort(prosVal)}
@@ -274,7 +294,7 @@ function SalesChart() {
         );
       })}
 
-      {/* X-Axis Month Labels (Crisp Dark Text) */}
+      {/* X-Axis Month Labels */}
       {MONTHS.map((month, index) => {
         const x = padL + slot * index + slot / 2;
         const hasData = LEADS_BY_MONTH[index] > 0 || PROSPECTS_BY_MONTH[index] > 0;
@@ -282,69 +302,21 @@ function SalesChart() {
           <g key={month}>
             <text
               x={x}
-              y={height - 12}
+              y={height - 14}
               textAnchor="middle"
-              fill={hasData ? '#0F172A' : '#475569'}
-              fontSize="13"
-              fontWeight={hasData ? '800' : '600'}
+              fill={hasData ? '#0f172a' : '#64748b'}
+              fontSize="12"
+              fontWeight={hasData ? '700' : '500'}
               fontFamily="ui-sans-serif, system-ui, sans-serif"
             >
               {month}
             </text>
             {hasData && (
-              <circle cx={x} cy={height - 3} r="2.5" fill="#2563EB" />
+              <circle cx={x} cy={height - 6} r="2.5" fill={LEADS_COLOR} />
             )}
           </g>
         );
       })}
     </svg>
-  );
-}
-
-function MetricCard({
-  icon: Icon,
-  iconBg,
-  label,
-  value,
-  percent,
-  percentClass = 'text-slate-600 font-semibold',
-  ratio,
-  tagColor = 'bg-slate-50 text-slate-700 border-slate-200',
-}: {
-  icon: LucideIcon;
-  iconBg: string;
-  label: string;
-  value: string;
-  percent?: string;
-  percentClass?: string;
-  ratio?: string;
-  tagColor?: string;
-}) {
-  return (
-    <article className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition hover:shadow-md">
-      <div className="flex items-start gap-3.5">
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-2xs"
-          style={{ background: iconBg }}
-        >
-          <Icon className="h-5 w-5" strokeWidth={2.25} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
-          <p className="mt-1 text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 truncate">
-            {value}
-          </p>
-        </div>
-      </div>
-
-      {percent && ratio && (
-        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-          <span className={`px-2 py-0.5 rounded-full border text-[11px] ${tagColor}`}>
-            {percent}
-          </span>
-          <span className="font-semibold text-slate-700">{ratio}</span>
-        </div>
-      )}
-    </article>
   );
 }

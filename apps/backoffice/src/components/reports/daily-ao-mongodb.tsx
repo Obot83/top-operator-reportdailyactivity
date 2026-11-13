@@ -93,6 +93,26 @@ export type SlaInfo = {
   description: string;
 };
 
+export type OfficerItem = {
+  nama_ao: string;
+  username: string;
+  cabang: string;
+  keterangan: string;
+};
+
+export type ActivityTimelineItem = {
+  jenis_aktivitas: string;
+  waktu_pencatatan: string | null;
+  waktu_selesai: string | null;
+  sla: string;
+};
+
+export type SalesNoteItem = {
+  nama_user: string;
+  catatan: string;
+  waktu: string | null;
+};
+
 export type ActivityItem = {
   id: string;
   ao_id: string;
@@ -113,7 +133,28 @@ export type ActivityItem = {
   nominal: number;
   source: 'lead' | 'group';
   sla: SlaInfo;
+  officers?: OfficerItem[];
+  activities_timeline?: ActivityTimelineItem[];
+  sales_notes?: SalesNoteItem[];
 };
+
+export function formatFullDateTime(val: string | null | undefined): string {
+  if (!val || val === '-') return '-';
+  const trimmed = String(val).trim();
+  if (/^\d{2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+    return trimmed;
+  }
+  const d = new Date(trimmed);
+  if (isNaN(d.getTime())) return trimmed;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${day} ${month} ${year} ${hh}:${mm}:${ss}`;
+}
 
 type ChartItem = { label: string; value: number };
 type BarItem = { ao_id?: string; ao_name: string; value: number };
@@ -380,64 +421,42 @@ function AoBarChart({
 // ─── Stage Badge Component ───────────────────────────────────────────────────
 
 function FlowStageBadge({ stage }: { stage: FlowStageInfo }) {
-  switch (stage.badge_variant) {
-    case 'completed':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-          <span>{stage.name}</span>
-        </span>
-      );
-    case 'komite':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
-          <span>{stage.name}</span>
-        </span>
-      );
-    case 'survey':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
-          <span>{stage.name}</span>
-        </span>
-      );
-    case 'slik_pass':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
-          <span>{stage.name}</span>
-        </span>
-      );
-    case 'slik_reject':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-          <span>{stage.name}</span>
-        </span>
-      );
-    case 'cancelled':
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-          <span>{stage.name}</span>
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
-          <span>{stage.name}</span>
-        </span>
-      );
-  }
+  const styles: Record<string, string> = {
+    completed: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+    komite: 'bg-indigo-50 text-indigo-700 border-indigo-200/80',
+    survey: 'bg-sky-50 text-sky-700 border-sky-200/80',
+    slik_pass: 'bg-teal-50 text-teal-700 border-teal-200/80',
+    slik_reject: 'bg-amber-50 text-amber-700 border-amber-200/80',
+    cancelled: 'bg-rose-50 text-rose-700 border-rose-200/80',
+    draft: 'bg-slate-100 text-slate-700 border-slate-200/80',
+  };
+  const dotColors: Record<string, string> = {
+    completed: 'bg-emerald-500',
+    komite: 'bg-indigo-500',
+    survey: 'bg-sky-500',
+    slik_pass: 'bg-teal-500',
+    slik_reject: 'bg-amber-500',
+    cancelled: 'bg-rose-500',
+    draft: 'bg-slate-400',
+  };
+
+  const style = styles[stage.badge_variant] || styles.draft;
+  const dotColor = dotColors[stage.badge_variant] || dotColors.draft;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${style}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dotColor} shrink-0`} />
+      <span>{stage.name}</span>
+    </span>
+  );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function DailyAoMongoReport() {
   // Filter form states (input values)
-  const [filterDate, setFilterDate] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
   const [filterAo, setFilterAo] = useState('');
   const [filterKategori, setFilterKategori] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -447,7 +466,8 @@ export function DailyAoMongoReport() {
 
   // Applied filters (triggers actual query)
   const [applied, setApplied] = useState({
-    date: '',
+    startDate: '',
+    endDate: '',
     ao: '',
     kategori: 'all',
     status: 'all',
@@ -478,7 +498,8 @@ export function DailyAoMongoReport() {
     queryKey: ['mongo-daily', applied],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (applied.date) params.set('date', applied.date);
+      if (applied.startDate) params.set('startDate', applied.startDate);
+      if (applied.endDate) params.set('endDate', applied.endDate);
       if (applied.ao) params.set('ao', applied.ao);
       if (applied.kategori && applied.kategori !== 'all') params.set('kategori', applied.kategori);
       if (applied.status && applied.status !== 'all') params.set('status', applied.status);
@@ -509,7 +530,8 @@ export function DailyAoMongoReport() {
 
   const handleApplyFilter = () => {
     setApplied({
-      date: filterDate,
+      startDate: filterStartDate,
+      endDate: filterEndDate,
       ao: filterAo,
       kategori: filterKategori,
       status: filterStatus,
@@ -522,7 +544,8 @@ export function DailyAoMongoReport() {
   };
 
   const handleResetFilter = () => {
-    setFilterDate('');
+    setFilterStartDate('');
+    setFilterEndDate('');
     setFilterAo('');
     setFilterKategori('all');
     setFilterStatus('all');
@@ -530,7 +553,8 @@ export function DailyAoMongoReport() {
     setFilterAppType('all');
     setFilterQ('');
     setApplied({
-      date: '',
+      startDate: '',
+      endDate: '',
       ao: '',
       kategori: 'all',
       status: 'all',
@@ -624,7 +648,10 @@ export function DailyAoMongoReport() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `daily-ao-report-${applied.date || 'all'}.csv`);
+    link.setAttribute(
+      'download',
+      `daily-ao-report-${applied.startDate ? `${applied.startDate}_${applied.endDate || applied.startDate}` : 'all'}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -673,7 +700,7 @@ export function DailyAoMongoReport() {
     Cancelled: '#ef4444',
   };
 
-  // Compute 5-step status pipeline for modal visual
+  // Compute 6-step status pipeline for modal visual
   function getPipelineSteps(item: ActivityItem) {
     const s = item.raw_status;
     const stage = item.flow_stage.code;
@@ -708,78 +735,99 @@ export function DailyAoMongoReport() {
     } else if (s.survey === 'CANCELED' || stage === 'SURVEY_CANCELED') {
       s3Status = 'failed';
       s3Desc = 'Survei dibatalkan';
-    } else if (s.survey === 'SCHEDULED') {
+    } else if (s.survey === 'SCHEDULED' || s.survey === 'RESCHEDULED' || s.survey === 'WAITING') {
       s3Status = 'active';
-      s3Desc = 'Jadwal survei ditentukan';
-    } else if (s.survey === 'RESCHEDULED') {
-      s3Status = 'active';
-      s3Desc = 'Jadwal diulang';
-    } else if (s.survey === 'WAITING') {
-      s3Status = 'active';
-      s3Desc = 'Menunggu survei';
+      s3Desc = 'Sedang proses survei';
     }
 
-    // Step 4: Review Komite (Memorandum Kaops / KC)
+    // Step 4: Proses Rekomendasi CA
     let s4Status: 'passed' | 'failed' | 'active' | 'upcoming' = 'upcoming';
-    let s4Desc = 'Menunggu survei';
-    if (s.pengajuan === 'PROSES' || s.pengajuan === 'COMPLETED') {
-      s4Status = 'passed';
-      s4Desc = 'Approval KC disetujui';
-    } else if (s.pengajuan === 'TOLAK' || stage === 'KOMITE_REJECTED') {
+    let s4Desc = 'Menunggu survei selesai';
+    if (s3Status === 'failed' || s2Status === 'failed') {
       s4Status = 'failed';
-      s4Desc = 'Ditolak komite / KC';
-    } else if (stage === 'KOMITE_REVIEW') {
+      s4Desc = 'Dibatalkan pada tahap sebelumnya';
+    } else if (
+      s.pengajuan === 'PROSES' ||
+      s.pengajuan === 'COMPLETED' ||
+      stage === 'KOMITE_REVIEW' ||
+      stage === 'PENGAJUAN_COMPLETED'
+    ) {
+      s4Status = 'passed';
+      s4Desc = 'Rekomendasi CA disetujui';
+    } else if (s3Status === 'passed') {
       s4Status = 'active';
-      s4Desc = 'Review memorandum Kaops/KC';
+      s4Desc = 'Analisis kapasitas & DSR';
     }
 
-    // Step 5: Selesai Pengajuan
+    // Step 5: Review Komite (Memorandum Kaops / KC)
     let s5Status: 'passed' | 'failed' | 'active' | 'upcoming' = 'upcoming';
-    let s5Desc = 'Belum pengajuan';
-    if (stage === 'PENGAJUAN_COMPLETED') {
+    let s5Desc = 'Menunggu rekomendasi CA';
+    if (s.pengajuan === 'COMPLETED' || stage === 'PENGAJUAN_COMPLETED') {
       s5Status = 'passed';
-      s5Desc = 'Selesai & masuk core system';
+      s5Desc = 'Approval Komite / KC disetujui';
+    } else if (s.pengajuan === 'TOLAK' || stage === 'KOMITE_REJECTED') {
+      s5Status = 'failed';
+      s5Desc = 'Ditolak komite / KC';
+    } else if (s.pengajuan === 'PROSES' || stage === 'KOMITE_REVIEW') {
+      s5Status = 'active';
+      s5Desc = 'Review memorandum Kaops/KC';
     } else if (s4Status === 'failed') {
       s5Status = 'failed';
-      s5Desc = 'Pengajuan ditolak';
+      s5Desc = 'Tidak diteruskan ke komite';
+    }
+
+    // Step 6: Selesai Pengajuan
+    let s6Status: 'passed' | 'failed' | 'active' | 'upcoming' = 'upcoming';
+    let s6Desc = 'Belum pengajuan';
+    if (stage === 'PENGAJUAN_COMPLETED' || s.pengajuan === 'COMPLETED') {
+      s6Status = 'passed';
+      s6Desc = 'Selesai & masuk core system';
+    } else if (s5Status === 'failed') {
+      s6Status = 'failed';
+      s6Desc = 'Pengajuan ditolak';
+    } else if (s5Status === 'active') {
+      s6Status = 'upcoming';
+      s6Desc = 'Menunggu putusan komite';
     }
 
     return [
       s1,
       { title: '2. Cek SLIK / CBI', desc: s2Desc, status: s2Status },
       { title: '3. Survei Lapangan', desc: s3Desc, status: s3Status },
-      { title: '4. Review Komite', desc: s4Desc, status: s4Status },
-      { title: '5. Selesai Pengajuan', desc: s5Desc, status: s5Status },
+      { title: '4. Proses Rekomendasi CA', desc: s4Desc, status: s4Status },
+      { title: '5. Review Komite', desc: s5Desc, status: s5Status },
+      { title: '6. Selesai Pengajuan', desc: s6Desc, status: s6Status },
     ];
   }
 
   return (
     <main className="min-h-screen bg-[#f8fafc] px-3 sm:px-6 lg:px-8 py-5 space-y-5">
       {/* ── Top Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
         <div>
-          <nav className="text-xs text-slate-400 font-medium mb-1 flex items-center gap-1.5">
-            <span>Monitoring & Aktivitas</span>
+          <nav className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1.5">
+            <span>Operasional & Monitoring</span>
             <span className="text-slate-300">•</span>
             <span className="text-blue-600 font-semibold">Daily AO Activity Report</span>
           </nav>
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               Daily AO Activity Report
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-              Live Flow Sistem
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/70">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+              Live Pipeline Stream
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Monitoring aktivitas Account Officer berdasarkan alur status real (Input Leads, Cek SLIK, Survei, Review Komite, Pengajuan).
+          <p className="mt-0.5 text-xs text-slate-500 max-w-2xl">
+            Monitoring produktivitas harian Account Officer: Input Leads, Cek SLIK Gateway, Survei Lapangan, Memorandum Komite, hingga Booking Pencairan.
           </p>
         </div>
         <div className="flex items-center sm:flex-col sm:items-end justify-between border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-            Hari Ini
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            Tanggal Monitoring
           </span>
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-700 bg-slate-50 sm:bg-transparent px-2.5 py-1 sm:p-0 rounded-lg">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200/60">
             <CalendarDays className="w-3.5 h-3.5 text-blue-600 shrink-0" />
             <span>{todayFormatted}</span>
           </div>
@@ -787,46 +835,72 @@ export function DailyAoMongoReport() {
       </div>
 
       {/* ── Filter Card ── */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition-all">
-        <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
+      <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-blue-600" />
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Filter Parameter Laporan Real
+              Filter Parameter Laporan
             </h3>
           </div>
-          <span className="text-[11px] font-medium text-slate-400">
-            {applied.stage !== 'all' || applied.app_type !== 'all' || applied.date || applied.ao
-              ? 'Filter Aktif'
-              : 'Semua Parameter'}
+          <span className="text-[11px] font-medium text-slate-500">
+            {applied.stage !== 'all' || applied.app_type !== 'all' || applied.startDate || applied.endDate || applied.ao
+              ? 'Filter Kustom Aktif'
+              : 'Semua Parameter Data'}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3.5 items-end">
-          {/* Tanggal Aktivitas */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-              Tanggal Aktivitas
-            </label>
-            <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs text-slate-800 transition focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3.5 items-end">
+          {/* Range Tanggal Aktivitas (Dari - Sampai) */}
+          <div className="xl:col-span-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                Range Tanggal Aktivitas
+              </label>
+              {(filterStartDate || filterEndDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterStartDate('');
+                    setFilterEndDate('');
+                  }}
+                  className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                placeholder="Dari"
+                title="Dari Tanggal"
+                className="w-full h-9 rounded-lg border border-slate-200/90 bg-white px-2.5 text-xs text-slate-800 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                placeholder="Sampai"
+                title="Sampai Tanggal"
+                className="w-full h-9 rounded-lg border border-slate-200/90 bg-white px-2.5 text-xs text-slate-800 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+            </div>
           </div>
 
           {/* Account Officer (AO) */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
                 Account Officer (AO)
               </label>
               {filterAo && (
                 <button
                   type="button"
                   onClick={() => setFilterAo('')}
-                  className="text-[10px] text-blue-600 hover:text-blue-800 font-bold"
+                  className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold"
                 >
                   Reset
                 </button>
@@ -835,7 +909,7 @@ export function DailyAoMongoReport() {
             <select
               value={filterAo}
               onChange={(e) => setFilterAo(e.target.value)}
-              className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs text-slate-800 transition focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 truncate font-medium"
+              className="w-full h-9 rounded-lg border border-slate-200/90 bg-white px-3 text-xs text-slate-800 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 truncate font-medium"
             >
               <option value="">Semua AO ({officersQuery.data?.length || 0})</option>
               {(officersQuery.data ?? []).map((o) => (
@@ -848,15 +922,15 @@ export function DailyAoMongoReport() {
 
           {/* Tracking Proses (Flow Stage) */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Tracking Proses
             </label>
             <select
               value={filterStage}
               onChange={(e) => setFilterStage(e.target.value)}
-              className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs text-slate-800 transition focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full h-9 rounded-lg border border-slate-200/90 bg-white px-3 text-xs text-slate-800 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
-              <option value="all">Semua Tracking Proses</option>
+              <option value="all">Semua Tahap Pipeline</option>
               <option value="PENGAJUAN_COMPLETED">Pengajuan Completed (Approved)</option>
               <option value="KOMITE_REVIEW">Review Komite (Memorandum)</option>
               <option value="SURVEY_IN_PROGRESS">Sedang Proses Survey</option>
@@ -871,13 +945,13 @@ export function DailyAoMongoReport() {
 
           {/* Tipe Pengajuan (New vs RO) */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Tipe Pengajuan
             </label>
             <select
               value={filterAppType}
               onChange={(e) => setFilterAppType(e.target.value)}
-              className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs text-slate-800 transition focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full h-9 rounded-lg border border-slate-200/90 bg-white px-3 text-xs text-slate-800 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="all">Semua Tipe (Baru & RO)</option>
               <option value="NEW">Pengajuan Baru (New)</option>
@@ -887,13 +961,13 @@ export function DailyAoMongoReport() {
 
           {/* Kategori Produk */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
+            <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
               Kategori Produk
             </label>
             <select
               value={filterKategori}
               onChange={(e) => setFilterKategori(e.target.value)}
-              className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50/70 px-3 text-xs text-slate-800 transition focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className="w-full h-9 rounded-lg border border-slate-200/90 bg-white px-3 text-xs text-slate-800 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="all">Semua Produk</option>
               <option value="produk_umi">Produk UMI (ID: 005)</option>
@@ -903,17 +977,17 @@ export function DailyAoMongoReport() {
 
           {/* Pencarian */}
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">
-              Pencarian
+            <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
+              Kata Kunci
             </label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="ID, nama, status..."
+                placeholder="ID, nama nasabah, status..."
                 value={filterQ}
                 onChange={(e) => setFilterQ(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleApplyFilter()}
-                className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50/70 px-3 pr-8 text-xs text-slate-800 placeholder-slate-400 transition focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                className="w-full h-9 rounded-lg border border-slate-200/90 bg-white px-3 pr-8 text-xs text-slate-800 placeholder-slate-400 transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
               <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-3 pointer-events-none" />
             </div>
@@ -921,120 +995,120 @@ export function DailyAoMongoReport() {
         </div>
 
         {/* Action Buttons Row */}
-        <div className="flex flex-wrap justify-between sm:justify-end items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+        <div className="flex flex-wrap justify-between sm:justify-end items-center gap-2 pt-3 border-t border-slate-100">
           <button
             type="button"
             onClick={handleResetFilter}
-            className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition active:scale-95"
+            className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-lg border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            Reset
+            <span>Reset Filter</span>
           </button>
           <button
             type="button"
             onClick={handleApplyFilter}
-            className="inline-flex items-center gap-1.5 h-8 px-4 rounded-xl bg-[#2563eb] text-xs font-bold text-white shadow-sm hover:bg-[#1d4ed8] transition active:scale-95"
+            className="inline-flex items-center gap-1.5 h-8 px-4 rounded-lg bg-blue-600 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 active:bg-blue-800 transition"
           >
             <Filter className="w-3.5 h-3.5" />
-            Tampilkan
+            <span>Terapkan Parameter</span>
           </button>
         </div>
       </div>
 
       {/* ── 5 Metric Summary Cards Sesuai Flow Real ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {/* Card 1: Total Aktivitas */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Aktivitas</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Aktivitas</span>
+            <div className="w-8 h-8 rounded-lg border border-blue-200/70 bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{summary.total}</span>
+            <span className="text-2xl font-bold text-slate-900 tabular-nums">{summary.total}</span>
           </div>
-          <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500 font-medium">
-            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold">
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+            <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold border border-blue-200/60">
               Baru: {summary.new_loan_count}
             </span>
-            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-bold">
+            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200/60">
               RO: {summary.repeat_order_count}
             </span>
           </div>
         </div>
 
         {/* Card 2: Pengajuan Completed */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Completed</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Completed</span>
+            <div className="w-8 h-8 rounded-lg border border-emerald-200/70 bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{summary.completed}</span>
+            <span className="text-2xl font-bold text-slate-900 tabular-nums">{summary.completed}</span>
           </div>
-          <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
+          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
             <span>
-              <span className="font-bold text-emerald-600">{pctCompleted}%</span> Selesai approval KC
+              <strong className="text-emerald-700 font-semibold">{pctCompleted}%</strong> Selesai KC
             </span>
             {summary.avg_sla_completed_formatted && summary.avg_sla_completed_formatted !== '-' && (
               <span
-                className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                className="px-1.5 py-0.5 rounded font-mono text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
                 title={`Rata-rata SLA Pengajuan Complete: ${summary.avg_sla_completed_formatted}`}
               >
-                Avg SLA: {summary.avg_sla_completed_formatted}
+                Avg: {summary.avg_sla_completed_formatted}
               </span>
             )}
           </div>
         </div>
 
         {/* Card 3: Review Komite */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Review Komite</span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Review Komite</span>
+            <div className="w-8 h-8 rounded-lg border border-indigo-200/70 bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{summary.komite_review}</span>
+            <span className="text-2xl font-bold text-slate-900 tabular-nums">{summary.komite_review}</span>
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            <span className="font-bold text-indigo-600">{pctKomite}%</span> Memorandum Kaops/KC
+          <p className="mt-2 text-[11px] text-slate-500">
+            <strong className="text-indigo-700 font-semibold">{pctKomite}%</strong> Memorandum KC
           </p>
         </div>
 
         {/* Card 4: Sedang Proses Survey */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Proses Survey</span>
-            <div className="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Proses Survey</span>
+            <div className="w-8 h-8 rounded-lg border border-sky-200/70 bg-sky-50 text-sky-700 flex items-center justify-center shrink-0">
               <Clock className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{summary.sedang_survey}</span>
+            <span className="text-2xl font-bold text-slate-900 tabular-nums">{summary.sedang_survey}</span>
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            <span className="font-bold text-cyan-600">{pctSurvey}%</span> Terjadwal & antrean survei
+          <p className="mt-2 text-[11px] text-slate-500">
+            <strong className="text-sky-700 font-semibold">{pctSurvey}%</strong> Antrean survei
           </p>
         </div>
 
         {/* Card 5: Dibatalkan / Reject */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition hover:shadow-md col-span-2 sm:col-span-1">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs relative overflow-hidden transition-all hover:border-slate-300 col-span-2 sm:col-span-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Dibatalkan / Tolak</span>
-            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Dibatalkan / Tolak</span>
+            <div className="w-8 h-8 rounded-lg border border-rose-200/70 bg-rose-50 text-rose-700 flex items-center justify-center shrink-0">
               <XCircle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900">{summary.cancelled}</span>
+            <span className="text-2xl font-bold text-slate-900 tabular-nums">{summary.cancelled}</span>
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            <span className="font-bold text-rose-600">{pctCancelled}%</span> SLIK/Survey/Komite
+          <p className="mt-2 text-[11px] text-slate-500">
+            <strong className="text-rose-700 font-semibold">{pctCancelled}%</strong> Reject/Batal
           </p>
         </div>
       </div>
@@ -1042,12 +1116,12 @@ export function DailyAoMongoReport() {
       {/* ── 3 Charts Row ── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Chart 1: Kategori */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
           <div>
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Aktivitas per Kategori
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Komposisi pengajuan & produk</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Komposisi pengajuan & produk</p>
           </div>
           <DonutChart
             items={summary.by_kategori}
@@ -1058,12 +1132,12 @@ export function DailyAoMongoReport() {
         </div>
 
         {/* Chart 2: Status */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
           <div>
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Aktivitas per Status
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Sebaran status penyelesaian sistem</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Sebaran status penyelesaian sistem</p>
           </div>
           <DonutChart
             items={summary.by_status}
@@ -1074,7 +1148,7 @@ export function DailyAoMongoReport() {
         </div>
 
         {/* Chart 3: AO Bar Chart */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs flex flex-col justify-between">
           <div>
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Aktivitas per AO
@@ -1090,14 +1164,16 @@ export function DailyAoMongoReport() {
       </div>
 
       {/* ── Table: Daftar Aktivitas ── */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
+      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
         {/* Table Top Header */}
         <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100">
           <div>
-            <h2 className="text-base font-extrabold text-slate-900">Daftar Aktivitas Real Time</h2>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">Daftar Aktivitas Real Time</h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Menampilkan {activities.length} dari {pagination.total} data aktivitas{' '}
-              {applied.date ? `pada tanggal ${applied.date}` : '(Semua Tanggal)'}
+              {applied.startDate
+                ? `pada periode ${applied.startDate}${applied.endDate ? ` s/d ${applied.endDate}` : ''}`
+                : '(Semua Tanggal)'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1189,15 +1265,17 @@ export function DailyAoMongoReport() {
                 activities.map((item, idx) => {
                   const rowNumber = (pagination.page - 1) * pagination.limit + idx + 1;
                   return (
-                    <tr key={item.id} className="hover:bg-blue-50/40 transition group">
+                    <tr key={item.id} className="even:bg-slate-50/30 hover:bg-blue-50/50 transition group">
                       {/* No */}
                       <td className="py-3.5 px-3.5 text-center text-slate-400 font-mono text-[11px]">
                         {rowNumber}
                       </td>
 
-                      {/* Waktu */}
-                      <td className="py-3.5 px-3.5 font-bold text-slate-800 whitespace-nowrap">
-                        {formatWaktu(item.waktu)}
+                      {/* Waktu (Date Time) */}
+                      <td className="py-3.5 px-3.5 font-medium text-slate-800 whitespace-nowrap">
+                        <div className="font-semibold text-slate-900 text-xs">
+                          {formatFullDateTime(item.waktu)}
+                        </div>
                       </td>
 
                       {/* AO */}
@@ -1260,21 +1338,43 @@ export function DailyAoMongoReport() {
                         <FlowStageBadge stage={item.flow_stage} />
                       </td>
 
-                      {/* Status Leads (Key-value mentah) */}
+                      {/* Status Leads (Semantic Flow Indicator) */}
                       <td className="py-3.5 px-3.5 whitespace-nowrap">
-                        <div className="font-mono text-[10px] text-slate-600 bg-slate-50 border border-slate-100 p-1.5 rounded-lg space-y-0.5 leading-tight">
-                          <div>
-                            <span className="text-slate-400">lead:</span>{' '}
-                            <span className="font-bold text-slate-800">{item.raw_status.lead ?? 'null'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">survey:</span>{' '}
-                            <span className="font-bold text-slate-800">{item.raw_status.survey ?? 'null'}</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">pengajuan:</span>{' '}
-                            <span className="font-bold text-slate-800">{item.raw_status.pengajuan ?? 'null'}</span>
-                          </div>
+                        <div className="flex items-center gap-1 text-[10px]">
+                          <span
+                            className={`px-1.5 py-0.5 rounded font-mono font-medium ${
+                              item.raw_status.lead === 'RESPONSE'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                            }`}
+                            title={`Status Leads: ${item.raw_status.lead ?? 'null'}`}
+                          >
+                            L: {item.raw_status.lead ?? '-'}
+                          </span>
+                          <span className="text-slate-300">›</span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded font-mono font-medium ${
+                              item.raw_status.survey === 'DONE'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                                : item.raw_status.survey === 'CANCELED'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200/70'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                            }`}
+                            title={`Status Survei: ${item.raw_status.survey ?? 'null'}`}
+                          >
+                            S: {item.raw_status.survey ?? '-'}
+                          </span>
+                          <span className="text-slate-300">›</span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded font-mono font-medium ${
+                              item.raw_status.pengajuan === 'COMPLETED' || item.raw_status.pengajuan === 'PROSES'
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200/70'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                            }`}
+                            title={`Status Pengajuan: ${item.raw_status.pengajuan ?? 'null'}`}
+                          >
+                            P: {item.raw_status.pengajuan ?? '-'}
+                          </span>
                         </div>
                       </td>
 
@@ -1289,12 +1389,12 @@ export function DailyAoMongoReport() {
                       {/* Status Umum */}
                       <td className="py-3.5 px-3.5 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
                             item.status === 'Completed'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                               : item.status === 'Cancelled'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200/80'
+                              : 'bg-amber-50 text-amber-700 border-amber-200/80'
                           }`}
                         >
                           <span
@@ -1315,7 +1415,7 @@ export function DailyAoMongoReport() {
                         {item.sla ? (
                           item.sla.status === 'COMPLETED' ? (
                             <span
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-mono tabular-nums"
                               title={`SLA Selesai: ${item.sla.formatted_long || item.sla.formatted} (Berhenti di Pengajuan Complete)\nMulai: ${item.sla.start_time ? formatDateTime(item.sla.start_time) : '-'}\nSelesai: ${item.sla.end_time ? formatDateTime(item.sla.end_time) : '-'}`}
                             >
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -1323,7 +1423,7 @@ export function DailyAoMongoReport() {
                             </span>
                           ) : item.sla.status === 'RUNNING' ? (
                             <span
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200"
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/80 font-mono tabular-nums"
                               title={`SLA Berjalan: Masih dalam proses (${item.flow_stage.name}), belum complete\nMulai: ${item.sla.start_time ? formatDateTime(item.sla.start_time) : '-'}`}
                             >
                               <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse shrink-0" />
@@ -1331,7 +1431,7 @@ export function DailyAoMongoReport() {
                             </span>
                           ) : item.sla.status === 'CANCELLED' ? (
                             <span
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200"
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80 font-mono tabular-nums"
                               title={`SLA Berhenti: Proses dibatalkan/ditolak (${item.flow_stage.name})\nMulai: ${item.sla.start_time ? formatDateTime(item.sla.start_time) : '-'}\nBerhenti: ${item.sla.end_time ? formatDateTime(item.sla.end_time) : '-'}`}
                             >
                               <XCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -1350,7 +1450,7 @@ export function DailyAoMongoReport() {
                         <button
                           type="button"
                           onClick={() => setSelectedItem(item)}
-                          className="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition active:scale-95 shadow-2xs"
+                          className="w-7 h-7 inline-flex items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition active:scale-95 shadow-2xs"
                           title="Lihat Detail & Flow Status Real"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -1437,7 +1537,7 @@ export function DailyAoMongoReport() {
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
+            className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
             role="dialog"
             aria-modal="true"
           >
@@ -1543,7 +1643,7 @@ export function DailyAoMongoReport() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1">
                   {getPipelineSteps(selectedItem).map((step, idx) => (
                     <div
                       key={idx}
@@ -1658,89 +1758,260 @@ export function DailyAoMongoReport() {
                 </div>
               )}
 
-              {/* Grid 2 Columns: Informasi Petugas & Detail Tracking */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Petugas AO */}
-                <div className="p-4 rounded-xl border border-slate-200/80 bg-white space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-slate-700 font-bold text-[11px] uppercase tracking-wider">
-                    <User className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Petugas Account Officer</span>
-                  </div>
+              {/* ── 3 Tabel Spesifikasi: Petugas AO, Aktivitas & Waktu, Catatan Sales ── */}
+              {(() => {
+                const officersList: OfficerItem[] = selectedItem.officers?.length
+                  ? selectedItem.officers
+                  : [
+                      {
+                        nama_ao: selectedItem.ao_name || '-',
+                        username: selectedItem.ao_id || '-',
+                        cabang: selectedItem.branch || 'Depok Sertifikat',
+                        keterangan: 'Input Data Pemohon',
+                      },
+                      {
+                        nama_ao: selectedItem.ao_name || '-',
+                        username: selectedItem.ao_id || '-',
+                        cabang: selectedItem.branch || 'Depok Sertifikat',
+                        keterangan: 'Pengecekan SLIK',
+                      },
+                      {
+                        nama_ao: selectedItem.ao_name || '-',
+                        username: selectedItem.ao_id ? `${selectedItem.ao_id.replace(/_(sur|col)$/i, '')}_sur` : '-',
+                        cabang: selectedItem.branch || 'Depok Sertifikat',
+                        keterangan: 'Survey',
+                      },
+                    ];
 
-                  <div className="space-y-2">
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Nama AO</span>
-                      <span className="font-bold text-slate-800 text-xs">{selectedItem.ao_name}</span>
+                const activitiesTimelineList: ActivityTimelineItem[] = selectedItem.activities_timeline?.length
+                  ? selectedItem.activities_timeline
+                  : [
+                      {
+                        jenis_aktivitas: 'Input Leads',
+                        waktu_pencatatan: selectedItem.waktu,
+                        waktu_selesai: selectedItem.sla?.start_time || selectedItem.waktu,
+                        sla: '< 1m',
+                      },
+                      {
+                        jenis_aktivitas: 'Cek SLIK',
+                        waktu_pencatatan: selectedItem.sla?.start_time || selectedItem.waktu,
+                        waktu_selesai: selectedItem.sla?.end_time || null,
+                        sla: selectedItem.sla?.status === 'RUNNING' ? 'Sedang Berjalan' : selectedItem.sla?.formatted || '-',
+                      },
+                      {
+                        jenis_aktivitas: 'Survey',
+                        waktu_pencatatan: selectedItem.follow_up || null,
+                        waktu_selesai: selectedItem.sla?.end_time || null,
+                        sla: selectedItem.sla?.status === 'COMPLETED' ? 'Selesai' : '-',
+                      },
+                    ];
+
+                const salesNotesList: SalesNoteItem[] = selectedItem.sales_notes?.length
+                  ? selectedItem.sales_notes
+                  : selectedItem.hasil_aktivitas
+                  ? [
+                      {
+                        nama_user: `${selectedItem.ao_name} (${selectedItem.ao_id})`,
+                        catatan: selectedItem.hasil_aktivitas,
+                        waktu: selectedItem.waktu,
+                      },
+                    ]
+                  : [];
+
+                return (
+                  <div className="space-y-4">
+                    {/* ── Card Terpadu: Petugas Account Officer & Aktivitas Waktu ── */}
+                    <div className="p-4 rounded-xl border border-slate-200/90 bg-white space-y-4 shadow-2xs">
+                      <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                        <div className="flex items-center gap-2 text-slate-800 font-bold text-xs uppercase tracking-wider">
+                          <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                            <Users className="w-3.5 h-3.5" />
+                          </div>
+                          <span>Petugas Account Officer & Timeline Aktivitas</span>
+                        </div>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {officersList.length} Petugas Terkait • Tracking SLA
+                        </span>
+                      </div>
+
+                      {/* Sub-tabel 1: Petugas Account Officer */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 text-slate-700 font-bold text-[11px] uppercase tracking-wide">
+                          <User className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Daftar Petugas Account Officer</span>
+                        </div>
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase">
+                                <th className="py-2.5 px-3">Nama AO</th>
+                                <th className="py-2.5 px-3">Username</th>
+                                <th className="py-2.5 px-3">Cabang</th>
+                                <th className="py-2.5 px-3">Keterangan</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {officersList.map((off, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                                  <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {off.nama_ao}
+                                  </td>
+                                  <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
+                                    <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70 font-medium">
+                                      {off.username}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-700">
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                                      <span>{off.cabang}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                                        off.keterangan === 'Input Data Pemohon'
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                          : off.keterangan === 'Pengecekan SLIK'
+                                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                          : off.keterangan === 'Survey'
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          : 'bg-slate-100 text-slate-700 border-slate-200'
+                                      }`}
+                                    >
+                                      {off.keterangan}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Sub-tabel 2: Aktivitas & Waktu */}
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center gap-1.5 text-slate-700 font-bold text-[11px] uppercase tracking-wide">
+                          <Clock className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Aktivitas & Waktu Real Time</span>
+                        </div>
+                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase">
+                                <th className="py-2.5 px-3">Jenis Aktivitas</th>
+                                <th className="py-2.5 px-3">Waktu Pencatatan</th>
+                                <th className="py-2.5 px-3">Waktu Selesai</th>
+                                <th className="py-2.5 px-3">SLA</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {activitiesTimelineList.map((act, idx) => {
+                                const isRunning = act.sla === 'Sedang Berjalan';
+                                const isNotStarted = act.sla === '-';
+                                return (
+                                  <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                                    <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`w-2 h-2 rounded-full shrink-0 ${
+                                            isRunning
+                                              ? 'bg-amber-500 animate-pulse'
+                                              : isNotStarted
+                                              ? 'bg-slate-300'
+                                              : 'bg-emerald-500'
+                                          }`}
+                                        />
+                                        <span>{act.jenis_aktivitas}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                                      {formatFullDateTime(act.waktu_pencatatan)}
+                                    </td>
+                                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                                      {formatFullDateTime(act.waktu_selesai)}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <span
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-bold border ${
+                                          isRunning
+                                            ? 'bg-amber-50 text-amber-800 border-amber-300'
+                                            : isNotStarted
+                                            ? 'bg-slate-100 text-slate-500 border-slate-200'
+                                            : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                        }`}
+                                      >
+                                        {isRunning && <Clock className="w-3 h-3 text-amber-600 animate-pulse" />}
+                                        {!isRunning && !isNotStarted && (
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        )}
+                                        <span>{act.sla}</span>
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     </div>
 
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Username / ID AO</span>
-                      <span className="font-mono text-slate-600 text-xs bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
-                        {selectedItem.ao_id}
-                      </span>
-                    </div>
+                    {/* ── Card Catatan & Keterangan Petugas ── */}
+                    <div className="p-4 rounded-xl border border-slate-200/90 bg-white space-y-3 shadow-2xs">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div className="flex items-center gap-2 text-slate-800 font-bold text-xs uppercase tracking-wider">
+                          <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                            <MessageSquareText className="w-3.5 h-3.5" />
+                          </div>
+                          <span>Catatan & Keterangan Petugas</span>
+                        </div>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Sales, Surveyor, Credit Analyst, & Komite ({salesNotesList.length} Catatan)
+                        </span>
+                      </div>
 
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Cabang Operasional</span>
-                      <div className="flex items-center gap-1 text-slate-800 font-semibold text-xs mt-0.5">
-                        <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                        <span>{selectedItem.branch || 'Semua Cabang'}</span>
+                      <div className="overflow-x-auto rounded-lg border border-slate-200">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase">
+                              <th className="py-2.5 px-3 w-1/4">Nama User / Petugas</th>
+                              <th className="py-2.5 px-3 w-1/2">Catatan / Keterangan</th>
+                              <th className="py-2.5 px-3 w-1/4 whitespace-nowrap">Waktu</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {salesNotesList.length > 0 ? (
+                              salesNotesList.map((n, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/70 transition-colors align-top">
+                                  <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                    <div className="flex items-center gap-1.5">
+                                      <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <span>{n.nama_user}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                    {n.catatan}
+                                  </td>
+                                  <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                                    {formatFullDateTime(n.waktu)}
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={3} className="py-4 text-center text-slate-400 italic">
+                                  Tidak ada catatan dari petugas untuk aktivitas ini.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </div>
-                </div>
-
-                {/* Aktivitas & Jadwal */}
-                <div className="p-4 rounded-xl border border-slate-200/80 bg-white space-y-3">
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-slate-700 font-bold text-[11px] uppercase tracking-wider">
-                    <Briefcase className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Aktivitas & Waktu</span>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Jenis Aktivitas</span>
-                      <span className="font-bold text-slate-800 text-xs">{selectedItem.jenis_aktivitas}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Waktu Pencatatan</span>
-                      <span className="font-semibold text-slate-800 text-xs">
-                        {new Date(selectedItem.waktu).toLocaleString('id-ID', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        })}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Jadwal Follow Up / Survey</span>
-                      <span className="font-semibold text-slate-800 text-xs">
-                        {selectedItem.follow_up
-                          ? new Date(selectedItem.follow_up).toLocaleDateString('id-ID', {
-                              dateStyle: 'full',
-                            })
-                          : 'Tidak ada jadwal lanjutan'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Catatan / Hasil Aktivitas */}
-              <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50 space-y-1.5">
-                <div className="flex items-center gap-2 text-slate-700 font-bold text-[11px] uppercase tracking-wider">
-                  <MessageSquareText className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Catatan & Keterangan Sales</span>
-                </div>
-                <div className="p-3 bg-white rounded-lg border border-slate-200 text-slate-700 text-xs leading-relaxed">
-                  {selectedItem.hasil_aktivitas ? (
-                    <p className="whitespace-pre-wrap">{selectedItem.hasil_aktivitas}</p>
-                  ) : (
-                    <p className="text-slate-400 italic">Tidak ada catatan tambahan dari AO.</p>
-                  )}
-                </div>
-              </div>
+                );
+              })()}
             </div>
 
             {/* Modal Bottom Footer */}

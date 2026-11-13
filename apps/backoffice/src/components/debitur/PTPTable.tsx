@@ -27,35 +27,39 @@ const STATUS_BADGE: Record<string, { label: string; variant: 'default' | 'second
 const columns = [
   columnHelper.accessor('createdAt', {
     header: ({ column }) => (
-      <Button variant="ghost" size="sm" onClick={() => column.toggleSorting()}>
+      <Button variant="ghost" size="sm" onClick={() => column.toggleSorting()} className="-ml-3 h-8 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         Dibuat <ArrowUpDown className="ml-1 h-3 w-3" />
       </Button>
     ),
-    cell: (info) => <span className="text-xs">{formatDate(info.getValue())}</span>,
+    cell: (info) => <span className="text-xs font-mono text-muted-foreground">{formatDate(info.getValue())}</span>,
   }),
   columnHelper.accessor('targetDate', {
-    header: 'Target Bayar',
-    cell: (info) => <span className="font-medium text-sm">{formatDate(info.getValue())}</span>,
+    header: () => <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Target Bayar</span>,
+    cell: (info) => <span className="font-semibold text-xs text-foreground whitespace-nowrap">{formatDate(info.getValue())}</span>,
   }),
   columnHelper.accessor('nominalKomitmen', {
-    header: 'Nominal Komitmen',
-    cell: (info) => <span className="font-mono text-sm">{formatRupiah(info.getValue())}</span>,
+    header: () => <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right block">Nominal Komitmen</span>,
+    cell: (info) => <span className="font-mono font-semibold text-xs text-foreground text-right block tabular-nums">{formatRupiah(info.getValue())}</span>,
   }),
   columnHelper.accessor('honoredNominal', {
-    header: 'Realisasi',
+    header: () => <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right block">Realisasi</span>,
     cell: (info) => info.getValue() ? (
-      <span className="font-mono text-sm text-green-600">{formatRupiah(info.getValue()!)}</span>
-    ) : <span className="text-muted-foreground text-xs">-</span>,
+      <span className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 text-right block tabular-nums">{formatRupiah(info.getValue()!)}</span>
+    ) : <span className="text-muted-foreground text-xs text-right block italic">-</span>,
   }),
   columnHelper.accessor('status', {
-    header: 'Status',
+    header: () => <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-center block">Status</span>,
     cell: (info) => {
       const s = STATUS_BADGE[info.getValue()] ?? { label: info.getValue(), variant: 'outline' as const };
-      return <Badge variant={s.variant}>{s.label}</Badge>;
+      return (
+        <div className="text-center">
+          <Badge variant={s.variant} className="text-[10px] font-semibold">{s.label}</Badge>
+        </div>
+      );
     },
   }),
   columnHelper.accessor('brokenReason', {
-    header: 'Keterangan',
+    header: () => <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Keterangan</span>,
     cell: (info) => <span className="text-xs text-muted-foreground">{info.getValue() ?? '-'}</span>,
   }),
 ];
@@ -74,35 +78,41 @@ export function PTPTable({ ptpHistory }: { ptpHistory: PTPTrackingData[] }) {
 
   if (ptpHistory.length === 0) {
     return (
-      <div className="border rounded-lg p-6 text-center">
-        <p className="text-sm text-muted-foreground">Belum ada riwayat Janji Bayar (PTP)</p>
+      <div className="rounded-xl border border-dashed border-border/80 p-8 text-center bg-muted/10">
+        <p className="text-xs text-muted-foreground">Belum ada riwayat Janji Bayar (PTP) untuk debitur ini.</p>
       </div>
     );
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="bg-muted/30 px-4 py-2 border-b">
-        <h3 className="text-sm font-semibold">Riwayat Janji Bayar (PTP)</h3>
+    <div className="rounded-xl border border-border/80 shadow-2xs overflow-hidden bg-card">
+      <div className="bg-muted/40 px-4 py-3 border-b border-border/80 flex items-center justify-between">
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Riwayat Janji Bayar (Promise to Pay)</h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Catatan komitmen dan realisasi pembayaran janji bayar debitur</p>
+        </div>
+        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/20">
+          {ptpHistory.length} Riwayat
+        </span>
       </div>
       <div className="overflow-x-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/50 border-b border-border/80">
             {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
+              <TableRow key={hg.id} className="hover:bg-transparent">
                 {hg.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className="px-3.5 py-2.5">
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+          <TableBody className="divide-y divide-border/50">
             {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="hover:bg-muted/50">
+              <TableRow key={row.id} className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell key={cell.id} className="px-3.5 py-3">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

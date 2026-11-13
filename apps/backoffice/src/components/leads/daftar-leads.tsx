@@ -80,64 +80,75 @@ export function DaftarLeads() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f6fb] px-4 py-6 sm:px-6">
-      <p className="text-xs text-slate-400">Leads / List Leads</p>
-      <h1 className="mt-1 text-[28px] font-bold tracking-tight text-slate-900">List Leads</h1>
+    <main className="min-h-screen bg-[#f8fafc] px-4 py-6 sm:px-6 space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+        <div>
+          <nav className="text-xs text-slate-500 font-medium mb-1 flex items-center gap-1.5">
+            <span>Operasional & Pipeline</span>
+            <span className="text-slate-300">•</span>
+            <span className="text-blue-600 font-semibold">Daftar Leads</span>
+          </nav>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">List Leads</h1>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Daftar aplikasi pengajuan calon debitur yang masuk dari sales lapangan untuk proses credit checking & survei.
+          </p>
+        </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-4">
-        <label className="relative block w-full max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setPage(1);
-            }}
-            placeholder="Search"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-300"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm text-slate-500">
-          Filter By :
-          <select
-            value={filter}
-            onChange={(event) => {
-              setFilter(event.target.value as (typeof FILTERS)[number]);
-              setPage(1);
-            }}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"
-          >
-            {FILTERS.map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
-          </select>
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="relative block w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Cari nama, NIK, ID..."
+              className="w-full rounded-lg border border-slate-200/90 bg-white py-2 pl-9 pr-3 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+            <span>Status:</span>
+            <select
+              value={filter}
+              onChange={(event) => {
+                setFilter(event.target.value as (typeof FILTERS)[number]);
+                setPage(1);
+              }}
+              className="rounded-lg border border-slate-200/90 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 focus:border-blue-500 focus:outline-none"
+            >
+              {FILTERS.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-xl bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
-      <div ref={scrollerRef} className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-sm">
-          <thead className="border-b text-left text-slate-400">
-            <tr>
-              <th className="w-12 px-4 py-3 font-medium">
-                <input type="checkbox" aria-label="Pilih semua leads di halaman ini" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
-              </th>
-              <th className="px-3 py-3 font-medium">Nama / Leads Id</th>
-              <th className="px-3 py-3 font-medium">No KTP/Telp</th>
-              <th className="px-3 py-3 font-medium">Pengajuan</th>
-              <th className="px-3 py-3 font-medium">Action Lead</th>
-              <th className="px-3 py-3 font-medium">Status Credit Checking</th>
-              <th className="px-3 py-3 font-medium">Tgl Pengajuan</th>
-              <th className="w-24 px-3 py-3 font-medium"><span className="sr-only">Aksi</span></th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+        <div ref={scrollerRef} className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-xs text-left">
+            <thead className="border-b border-slate-200/80 bg-slate-50/90 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
+              <tr>
+                <th className="w-12 px-4 py-3 font-semibold text-center">
+                  <input type="checkbox" aria-label="Pilih semua leads di halaman ini" checked={allSelected} onChange={toggleAll} className="h-4 w-4 rounded border-slate-300" />
+                </th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">Nama / Leads Id</th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">No KTP / Telp</th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">Pengajuan</th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">Action Lead</th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">Status Credit Checking</th>
+                <th className="px-3 py-3 font-semibold whitespace-nowrap">Tgl Pengajuan</th>
+                <th className="w-24 px-3 py-3 font-semibold text-right"><span className="sr-only">Aksi</span></th>
+              </tr>
+            </thead>
+          <tbody className="divide-y divide-slate-100">
             {pageRows.map((lead) => {
               const open = expandedId === lead.id;
               return (
                 <Fragment key={lead.id}>
-                  <tr className="border-b last:border-0">
-                    <td className="px-4 py-4">
+                  <tr className={`border-b last:border-0 transition-colors ${open ? 'bg-slate-50/90' : 'even:bg-slate-50/40 hover:bg-slate-50/90'}`}>
+                    <td className="px-4 py-3.5 text-center">
                       <input
                         type="checkbox"
                         aria-label={`Pilih ${lead.nama}`}
@@ -146,19 +157,19 @@ export function DaftarLeads() {
                         className="h-4 w-4 rounded border-slate-300"
                       />
                     </td>
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-3.5">
                       <div className="font-semibold uppercase text-slate-800">{lead.nama}</div>
-                      <div className="mt-0.5 text-xs text-slate-400">{lead.id}</div>
+                      <div className="mt-0.5 text-xs text-slate-400 font-mono">{lead.id}</div>
                     </td>
-                    <td className="px-3 py-4">
-                      <div className="font-medium text-slate-800">{lead.diri.noKtp}</div>
-                      <div className="mt-0.5 text-xs text-slate-400">{lead.diri.noHp}</div>
+                    <td className="px-3 py-3.5">
+                      <div className="font-medium text-slate-800 font-mono">{lead.diri.noKtp}</div>
+                      <div className="mt-0.5 text-xs text-slate-400 font-mono">{lead.diri.noHp}</div>
                     </td>
-                    <td className="px-3 py-4 text-slate-700">{rupiah(lead.nominalPengajuan)}</td>
-                    <td className="px-3 py-4"><ActionLeadStatus value={lead.actionLead} /></td>
-                    <td className="px-3 py-4 text-slate-700">{lead.statusCredit}</td>
-                    <td className="whitespace-nowrap px-3 py-4 text-slate-700">{lead.detail.tglPengajuan}</td>
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-3.5 font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">{rupiah(lead.nominalPengajuan)}</td>
+                    <td className="px-3 py-3.5 whitespace-nowrap"><ActionLeadStatus value={lead.actionLead} /></td>
+                    <td className="px-3 py-3.5 text-slate-700 whitespace-nowrap">{lead.statusCredit}</td>
+                    <td className="whitespace-nowrap px-3 py-3.5 text-slate-600 font-mono text-[11px]">{lead.detail.tglPengajuan}</td>
+                    <td className="px-3 py-3.5 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1 text-slate-400">
                         <button
                           type="button"
@@ -241,8 +252,14 @@ export function DaftarLeads() {
 function ActionLeadStatus({ value }: { value: Lead['actionLead'] }) {
   const survey = value === 'Proses Survey';
   return (
-    <span className={`inline-flex items-center gap-2 ${survey ? 'text-amber-500' : 'text-emerald-500'}`}>
-      <span className={`h-2 w-2 rounded-full ${survey ? 'bg-amber-400' : 'bg-emerald-500'}`} />
+    <span
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+        survey
+          ? 'bg-amber-50 text-amber-700 border-amber-200/70'
+          : 'bg-emerald-50 text-emerald-700 border-emerald-200/70'
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${survey ? 'bg-amber-500' : 'bg-emerald-500'}`} />
       {value}
     </span>
   );

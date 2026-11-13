@@ -25,7 +25,11 @@ import {
   Navigation,
 } from 'lucide-react';
 import { formatRupiah } from '@/lib/formatters';
-import type { DailyCollectionData, CollectionPaymentRecord } from '@/app/api/reports/collection/daily/route';
+import type {
+  DailyCollectionData,
+  CollectionPaymentRecord,
+  CollectionDueDebtorRecord,
+} from '@/app/api/reports/collection/daily/route';
 
 const DPD_BUCKETS = [
   'Lancar (0)',
@@ -53,7 +57,9 @@ export function CollectionDailyReport() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
-  const [activeTab, setActiveTab] = useState<'feed' | 'collectors' | 'settlement' | 'analytics'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'due' | 'collectors' | 'settlement' | 'analytics'>('feed');
+  const [dueStatusFilter, setDueStatusFilter] = useState<'all' | 'Belum Tagih' | 'Gagal Tagih' | 'Janji Bayar'>('all');
+  const [dueSearchQuery, setDueSearchQuery] = useState('');
 
   // Query daily collection data
   const { data, isLoading, error, refetch, isFetching } = useQuery({
@@ -78,17 +84,75 @@ export function CollectionDailyReport() {
 
   const summary = data?.summary;
   const payments = data?.payments ?? [];
+  const dueDebtors = data?.dueDebtors ?? [];
   const settlements = data?.settlements ?? [];
   const collectors = data?.collectors ?? [];
   const branches = data?.branches ?? [];
   const pagination = data?.pagination;
+
+  const filteredDueDebtors = dueDebtors.filter((d) => {
+    if (selectedCollector !== 'all' && d.collector_id !== selectedCollector && d.collector_name !== selectedCollector) return false;
+    if (selectedBranch !== 'all' && d.branch_name !== selectedBranch && d.branch_id !== selectedBranch) return false;
+    if (selectedBucket !== 'all' && d.bucket !== selectedBucket) return false;
+    if (dueStatusFilter !== 'all' && d.status !== dueStatusFilter) return false;
+    if (dueSearchQuery.trim()) {
+      const q = dueSearchQuery.toLowerCase();
+      const haystack = `${d.contract_id} ${d.debitur} ${d.no_hp} ${d.collector_name} ${d.alamat_rumah ?? ''} ${d.status}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
 
   function resetFilters() {
     setSelectedCollector('all');
     setSelectedBranch('all');
     setSelectedBucket('all');
     setSearchQuery('');
+    setDueStatusFilter('all');
+    setDueSearchQuery('');
     setPage(1);
+  }
+
+  function downloadDueCsv() {
+    if (!filteredDueDebtors.length) return;
+    const header = [
+      'No. Kontrak',
+      'Debitur',
+      'No. HP',
+      'Kolektor',
+      'Lokasi Rumah',
+      'Latitude',
+      'Longitude',
+      'Link Google Maps',
+      'Tenor (Aktif/Total)',
+      'Total Tagihan',
+      'DPD (Hari)',
+      'Bucket DPD',
+      'Status',
+    ];
+    const rows = filteredDueDebtors.map((d) => [
+      `"${d.contract_id}"`,
+      `"${d.debitur}"`,
+      `"${d.no_hp}"`,
+      `"${d.collector_name}"`,
+      `"${(d.alamat_rumah ?? '').replace(/"/g, '""')}"`,
+      d.latitude != null ? d.latitude : '',
+      d.longitude != null ? d.longitude : '',
+      `"${d.maps_url ?? ''}"`,
+      `"${d.step_tenor}"`,
+      d.total_tagihan,
+      d.telat,
+      `"${d.bucket}"`,
+      `"${d.status}"`,
+    ]);
+    const csvContent = '\uFEFF' + [header.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `debitur-jatuh-tempo-${date}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function downloadCsv() {
@@ -426,6 +490,22 @@ export function CollectionDailyReport() {
 
         <button
           type="button"
+          onClick={() => setActiveTab('due')}
+          className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 ${
+            activeTab === 'due'
+              ? 'border-primary text-primary font-semibold'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          Daftar Debitur Jatuh Tempo ({dueDebtors.length})
+          <span className="rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.2 text-[10px] font-bold">
+            Belum Bayar
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('collectors')}
           className={`pb-2.5 transition-colors border-b-2 flex items-center gap-1.5 ${
             activeTab === 'collectors'
@@ -478,8 +558,8 @@ export function CollectionDailyReport() {
         </div>
       )}
 
-      {/* ── Empty State ─────────────────────────────────────── */}
-      {!isLoading && !error && payments.length === 0 && (
+      {/* ── Empty State (Khusus Tab Log Pembayaran) ───────── */}
+      {!isLoading && !error && payments.length === 0 && activeTab === 'feed' && (
         <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-3">
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Calendar className="h-6 w-6" />
@@ -507,48 +587,48 @@ export function CollectionDailyReport() {
       {/* ── Tab 1: Log Pembayaran & Kunjungan ───────────────── */}
       {!isLoading && !error && payments.length > 0 && activeTab === 'feed' && (
         <section className="space-y-4">
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50 border-b border-border/80 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3">No. Kontrak</th>
-                    <th className="px-4 py-3">Debitur</th>
-                    <th className="px-4 py-3 min-w-[200px]">Lokasi Rumah (GPS)</th>
-                    <th className="px-4 py-3">Kolektor</th>
-                    <th className="px-4 py-3">Cabang</th>
-                    <th className="px-4 py-3">Tenor</th>
-                    <th className="px-4 py-3">DPD</th>
-                    <th className="px-4 py-3 text-right">Tagihan</th>
-                    <th className="px-4 py-3 text-right">Realisasi (Bayar)</th>
-                    <th className="px-4 py-3">Waktu Bayar</th>
+                    <th className="px-3.5 py-3 whitespace-nowrap">No. Kontrak</th>
+                    <th className="px-3.5 py-3 whitespace-nowrap">Debitur / No. HP</th>
+                    <th className="px-3.5 py-3 min-w-[220px]">Lokasi Rumah (GPS)</th>
+                    <th className="px-3.5 py-3 whitespace-nowrap">Kolektor</th>
+                    <th className="px-3.5 py-3 whitespace-nowrap">Cabang</th>
+                    <th className="px-3.5 py-3 text-center whitespace-nowrap">Tenor</th>
+                    <th className="px-3.5 py-3 text-center whitespace-nowrap">DPD</th>
+                    <th className="px-3.5 py-3 text-right whitespace-nowrap">Total Tagihan</th>
+                    <th className="px-3.5 py-3 text-right whitespace-nowrap">Realisasi (Bayar)</th>
+                    <th className="px-3.5 py-3 text-center whitespace-nowrap">Waktu Bayar</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/60">
                   {payments.map((p) => (
-                    <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-mono font-medium text-xs">
+                    <tr key={p.id} className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
+                      <td className="px-3.5 py-3 font-mono font-medium text-xs">
                         <Link
                           href={`/dashboard/debitur/${encodeURIComponent(p.contract_id)}`}
                           className="text-primary hover:underline font-semibold flex items-center gap-1 group"
                           title="Buka Debitur Card Controller"
                         >
-                          {p.contract_id}
-                          <span className="opacity-0 group-hover:opacity-100 text-[10px] transition-opacity">↗</span>
+                          <span>{p.contract_id}</span>
+                          <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100 transition-opacity" />
                         </Link>
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-foreground">{p.debitur}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{p.no_hp}</p>
+                      <td className="px-3.5 py-3">
+                        <p className="font-semibold text-foreground text-xs">{p.debitur}</p>
+                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{p.no_hp}</p>
                       </td>
-                      <td className="px-4 py-3 max-w-[260px]">
+                      <td className="px-3.5 py-3 max-w-[260px]">
                         <div className="flex flex-col gap-1">
                           {p.alamat_rumah ? (
-                            <p className="text-xs text-foreground line-clamp-2 leading-tight" title={p.alamat_rumah}>
+                            <p className="text-[11px] text-foreground line-clamp-2 leading-tight" title={p.alamat_rumah}>
                               {p.alamat_rumah}
                             </p>
                           ) : (
-                            <span className="text-xs text-muted-foreground italic">Alamat belum terdaftar</span>
+                            <span className="text-[11px] text-muted-foreground italic">Alamat belum terdaftar</span>
                           )}
 
                           {p.latitude != null && p.longitude != null ? (
@@ -556,7 +636,7 @@ export function CollectionDailyReport() {
                               href={p.maps_url ?? `https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 rounded px-1.5 py-0.5 w-fit transition-colors group"
+                              className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 rounded px-1.5 py-0.5 w-fit transition-colors group"
                               title="Buka titik koordinat GPS di Google Maps"
                             >
                               <MapPin className="h-3 w-3 text-emerald-600 flex-shrink-0" />
@@ -568,7 +648,7 @@ export function CollectionDailyReport() {
                               href={p.maps_url ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.alamat_rumah)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted border border-border rounded px-1.5 py-0.5 w-fit transition-colors group"
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted border border-border rounded px-1.5 py-0.5 w-fit transition-colors group"
                               title="Cari alamat di Google Maps"
                             >
                               <Navigation className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -578,31 +658,34 @@ export function CollectionDailyReport() {
                           ) : null}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3.5 py-3">
                         <span className="font-medium text-foreground">{p.collector_name}</span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <td className="px-3.5 py-3 text-xs text-muted-foreground">
                         {p.branch_name}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {p.step_tenor}
+                      <td className="px-3.5 py-3 text-center">
+                        <span className="inline-flex items-center justify-center font-mono font-semibold px-2 py-0.5 rounded bg-muted/60 text-foreground text-[11px]">
+                          {p.step_tenor}
+                        </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3.5 py-3 text-center">
                         <span
-                          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${getBadgeVariant(
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getBadgeVariant(
                             p.bucket
                           )}`}
                         >
-                          {p.telat} hari · {p.bucket.split(' ')[0]}
+                          {p.telat} hari
                         </span>
+                        <span className="block text-[10px] text-muted-foreground mt-0.5">{p.bucket}</span>
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
+                      <td className="px-3.5 py-3 text-right font-mono text-xs text-muted-foreground">
                         {formatRupiah(p.total_tagihan)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                      <td className="px-3.5 py-3 text-right font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
                         {formatRupiah(p.nominal_dibayar)}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground font-mono whitespace-nowrap">
+                      <td className="px-3.5 py-3 text-center text-[11px] text-muted-foreground font-mono whitespace-nowrap">
                         {p.tgl_bayar}
                       </td>
                     </tr>
@@ -658,6 +741,256 @@ export function CollectionDailyReport() {
               </div>
             )}
           </div>
+        </section>
+      )}
+
+      {/* ── Tab: Daftar Debitur Jatuh Tempo (Hanya Yang Belum Bayar) ── */}
+      {!isLoading && !error && activeTab === 'due' && (
+        <section className="space-y-4">
+          {/* Mini KPI Cards for Due Debtors */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="rounded-xl border border-border bg-card p-3 shadow-2xs">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                Total Belum Bayar
+              </span>
+              <span className="mt-1 block text-lg font-bold text-foreground">
+                {dueDebtors.length} <span className="text-xs font-normal text-muted-foreground">debitur</span>
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3 shadow-2xs">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-destructive block">
+                Total Tagihan Tertunggak
+              </span>
+              <span className="mt-1 block text-lg font-mono font-bold text-destructive">
+                {formatRupiah(summary?.totalDueTagihan ?? dueDebtors.reduce((a, b) => a + b.total_tagihan, 0))}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 shadow-2xs">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 block">
+                Belum Tagih
+              </span>
+              <span className="mt-1 block text-lg font-bold text-amber-700 dark:text-amber-400">
+                {dueDebtors.filter((d) => d.status === 'Belum Tagih').length}{' '}
+                <span className="text-xs font-normal text-muted-foreground">debitur</span>
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-3 shadow-2xs">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-rose-700 dark:text-rose-400 block">
+                Gagal Tagih
+              </span>
+              <span className="mt-1 block text-lg font-bold text-rose-700 dark:text-rose-400">
+                {dueDebtors.filter((d) => d.status === 'Gagal Tagih').length}{' '}
+                <span className="text-xs font-normal text-muted-foreground">debitur</span>
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 shadow-2xs">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400 block">
+                Janji Bayar (PTP)
+              </span>
+              <span className="mt-1 block text-lg font-bold text-blue-700 dark:text-blue-400">
+                {dueDebtors.filter((d) => d.status === 'Janji Bayar').length}{' '}
+                <span className="text-xs font-normal text-muted-foreground">debitur</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Filter Bar for Due Debtors */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/20 p-3 rounded-xl border border-border">
+            {/* Status Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-semibold text-muted-foreground mr-1">Status:</span>
+              {(['all', 'Belum Tagih', 'Gagal Tagih', 'Janji Bayar'] as const).map((st) => {
+                const count =
+                  st === 'all'
+                    ? dueDebtors.length
+                    : dueDebtors.filter((d) => d.status === st).length;
+                const isActive = dueStatusFilter === st;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setDueStatusFilter(st)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                        : 'bg-card text-muted-foreground hover:bg-muted border-border'
+                    }`}
+                  >
+                    {st === 'all' ? 'Semua' : st} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search & Export */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Cari kontrak, debitur, kolektor..."
+                  value={dueSearchQuery}
+                  onChange={(e) => setDueSearchQuery(e.target.value)}
+                  className="h-8 w-full rounded-md border border-input bg-background pl-8 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={downloadDueCsv}
+                disabled={!filteredDueDebtors.length}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 shrink-0"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Unduh CSV</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Due Debtors Table */}
+          {filteredDueDebtors.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
+              <p className="font-semibold text-sm">Tidak ada debitur jatuh tempo yang cocok</p>
+              <p className="text-xs text-muted-foreground">Silakan sesuaikan filter pencarian atau status di atas.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 border-b border-border/80 text-left text-xs font-semibold text-muted-foreground">
+                    <tr>
+                      <th className="px-3.5 py-3 whitespace-nowrap">No Kontrak</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Debitur / No HP</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Kolektor</th>
+                      <th className="px-3.5 py-3 min-w-[220px]">Lokasi Rumah</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Tenor (aktif/total)</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Tagihan</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">DPD</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {filteredDueDebtors.map((p) => (
+                      <tr key={p.id} className="hover:bg-muted/30 transition-colors">
+                        {/* 1. No Kontrak */}
+                        <td className="px-3.5 py-3 font-mono font-medium">
+                          <Link
+                            href={`/dashboard/debitur/${encodeURIComponent(p.contract_id)}`}
+                            className="text-primary hover:underline font-semibold flex items-center gap-1"
+                            title="Buka Controller 360° Debitur"
+                          >
+                            <span>{p.contract_id}</span>
+                            <ExternalLink className="h-3 w-3 opacity-60" />
+                          </Link>
+                          {p.branch_name && p.branch_name !== '-' && (
+                            <span className="text-[10px] text-muted-foreground block mt-0.5 truncate max-w-[130px]">
+                              {p.branch_name}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 2. Debitur / No HP */}
+                        <td className="px-3.5 py-3">
+                          <div className="font-semibold text-foreground text-xs">{p.debitur}</div>
+                          {p.no_hp && p.no_hp !== '-' ? (
+                            <a
+                              href={`https://wa.me/${p.no_hp.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-mono text-[11px] text-muted-foreground hover:text-primary inline-flex items-center gap-1 mt-0.5 transition-colors"
+                              title="Hubungi via WhatsApp"
+                            >
+                              <span>{p.no_hp}</span>
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">-</span>
+                          )}
+                        </td>
+
+                        {/* 3. Kolektor */}
+                        <td className="px-3.5 py-3">
+                          <div className="font-medium text-foreground">{p.collector_name}</div>
+                          <span className="text-[10px] text-muted-foreground">Petugas Lapangan</span>
+                        </td>
+
+                        {/* 4. Lokasi Rumah */}
+                        <td className="px-3.5 py-3">
+                          <p className="text-[11px] text-foreground leading-snug line-clamp-2" title={p.alamat_rumah ?? ''}>
+                            {p.alamat_rumah || 'Alamat belum tercatat di sistem'}
+                          </p>
+                          {p.maps_url && (
+                            <a
+                              href={p.maps_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline mt-1"
+                            >
+                              <MapPin className="h-3 w-3 text-rose-500" />
+                              <span>Buka Google Maps</span>
+                              <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                            </a>
+                          )}
+                        </td>
+
+                        {/* 5. Tenor (aktif/total) */}
+                        <td className="px-3.5 py-3 text-center">
+                          <span className="inline-flex items-center justify-center font-mono font-semibold px-2 py-0.5 rounded bg-muted/60 text-foreground text-[11px]">
+                            {p.step_tenor}
+                          </span>
+                        </td>
+
+                        {/* 6. Tagihan */}
+                        <td className="px-3.5 py-3 text-right">
+                          <span className="font-mono font-bold text-foreground text-xs block">
+                            {formatRupiah(p.total_tagihan)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">Belum dibayar</span>
+                        </td>
+
+                        {/* 7. DPD */}
+                        <td className="px-3.5 py-3 text-center">
+                          <span
+                            className={`inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getBadgeVariant(
+                              p.bucket
+                            )}`}
+                          >
+                            {p.telat} hari
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground mt-0.5">{p.bucket}</span>
+                        </td>
+
+                        {/* 8. Status (Belum Tagih; Gagal Tagih; Janji Bayar) */}
+                        <td className="px-3.5 py-3 text-center whitespace-nowrap">
+                          {p.status === 'Belum Tagih' && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                              <Clock className="h-3 w-3" />
+                              Belum Tagih
+                            </span>
+                          )}
+                          {p.status === 'Gagal Tagih' && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:text-rose-400">
+                              <AlertTriangle className="h-3 w-3" />
+                              Gagal Tagih
+                            </span>
+                          )}
+                          {p.status === 'Janji Bayar' && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Janji Bayar
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -743,44 +1076,44 @@ export function CollectionDailyReport() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 border-b border-border/80 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-3">No. Bukti Setor</th>
-                      <th className="px-4 py-3">Waktu Setor</th>
-                      <th className="px-4 py-3">Kolektor</th>
-                      <th className="px-4 py-3">Cabang</th>
-                      <th className="px-4 py-3 text-center">Jumlah Kontrak</th>
-                      <th className="px-4 py-3 text-right">Setoran Tunai</th>
-                      <th className="px-4 py-3 text-right">Setoran Transfer</th>
-                      <th className="px-4 py-3 text-right">Total Setor</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">No. Bukti Setor</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Waktu Setor</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Kolektor</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Cabang</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Jumlah Kontrak</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Setoran Tunai</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Setoran Transfer</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Total Setor</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-border/60">
                     {settlements.map((s) => (
-                      <tr key={s.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3 font-mono font-medium text-xs text-primary">
+                      <tr key={s.id} className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
+                        <td className="px-3.5 py-3 font-mono font-semibold text-xs text-primary">
                           {s.id}
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground font-mono">
+                        <td className="px-3.5 py-3 text-center text-[11px] text-muted-foreground font-mono">
                           {s.date}
                         </td>
-                        <td className="px-4 py-3 font-medium text-foreground">
+                        <td className="px-3.5 py-3 font-medium text-foreground">
                           {s.collector_name}
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground font-mono">
+                        <td className="px-3.5 py-3 text-[11px] text-muted-foreground font-mono">
                           Cabang {s.branch_id}
                         </td>
-                        <td className="px-4 py-3 text-center font-mono text-xs">
+                        <td className="px-3.5 py-3 text-center font-mono font-semibold text-xs">
                           {s.contract_count}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-xs">
+                        <td className="px-3.5 py-3 text-right font-mono text-xs text-foreground">
                           {formatRupiah(s.cash)}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
+                        <td className="px-3.5 py-3 text-right font-mono text-xs text-muted-foreground">
                           {formatRupiah(s.tf)}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                        <td className="px-3.5 py-3 text-right font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
                           {formatRupiah(s.total)}
                         </td>
                       </tr>

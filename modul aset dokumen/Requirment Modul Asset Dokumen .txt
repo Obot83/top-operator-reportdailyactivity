@@ -1,0 +1,6 @@
+	2. Modul Asset Dokumen  (db ccs_krrn_dev) tabel jaminan
+		a. Modul Input Data Kredit dan Data Agunan ( data otomatis masuk dari input leads )
+		b. Tetapi jika bpr tidak menggunakan TOP Operator sebagai inputan leads maka kita sediakan untuk export data dari cbs dan sediakan API untuk komunikasi data.
+		c. Input Data Master Agunan
+		d. Input jaminan Dokumen
+		e. Pemindahan Aset Dokumen.

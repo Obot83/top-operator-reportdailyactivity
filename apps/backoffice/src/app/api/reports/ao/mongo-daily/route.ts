@@ -3,6 +3,8 @@ import { getMongoDb } from '@/lib/mongodb';
 import fs from 'fs';
 import path from 'path';
 
+export const dynamic = 'force-dynamic';
+
 const MONGODB_DIR = path.resolve('d:/Project/top-operator/mongodb');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -55,6 +57,26 @@ export type SlaInfo = {
   description: string;
 };
 
+export type OfficerItem = {
+  nama_ao: string;
+  username: string;
+  cabang: string;
+  keterangan: string;
+};
+
+export type ActivityTimelineItem = {
+  jenis_aktivitas: string;
+  waktu_pencatatan: string | null;
+  waktu_selesai: string | null;
+  sla: string;
+};
+
+export type SalesNoteItem = {
+  nama_user: string;
+  catatan: string;
+  waktu: string | null;
+};
+
 export type ActivityItem = {
   id: string;
   ao_id: string;
@@ -75,6 +97,9 @@ export type ActivityItem = {
   nominal: number;
   source: 'lead' | 'group';
   sla: SlaInfo;
+  officers: OfficerItem[];
+  activities_timeline: ActivityTimelineItem[];
+  sales_notes: SalesNoteItem[];
 };
 
 export type ChartItem = { label: string; value: number };
@@ -105,20 +130,71 @@ export type DailySummary = {
 
 let cachedLeads: any[] | null = null;
 let cachedGroups: any[] | null = null;
+let cachedUserDirectory: Map<string, { name: string; branch: string }> | null = null;
 
-async function loadData(dateStr?: string, aoId?: string): Promise<{ leads: any[]; groups: any[]; aoNames: Map<string, string> }> {
+function loadUserDirectory(): Map<string, { name: string; branch: string }> {
+  if (cachedUserDirectory) return cachedUserDirectory;
+  const map = new Map<string, { name: string; branch: string }>();
+  const csvPath = path.join(MONGODB_DIR, 'kospinus001.users_app.csv');
+  if (fs.existsSync(csvPath)) {
+    try {
+      const content = fs.readFileSync(csvPath, 'utf8');
+      const lines = content.split('\n');
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const parts = line.split(',');
+        const id = parts[0]?.trim();
+        const name = parts[1]?.trim();
+        const branch = parts[21]?.trim();
+        if (id && name) {
+          map.set(id, { name, branch: branch || '' });
+        }
+      }
+    } catch (e) {
+      console.warn('[mongo-daily] failed to read users_app.csv', e);
+    }
+  }
+  cachedUserDirectory = map;
+  return map;
+}
+
+async function loadData(
+  dateStr?: string,
+  aoId?: string,
+  startDateStr?: string,
+  endDateStr?: string
+): Promise<{
+  leads: any[];
+  groups: any[];
+  aoNames: Map<string, string>;
+  userDirectory: Map<string, { name: string; branch: string }>;
+}> {
   try {
     const db = await getMongoDb();
     const leadMatch: any = {};
     const groupMatch: any = {};
 
-    if (dateStr) {
-      const start = new Date(`${dateStr}T00:00:00+07:00`);
-      const end = new Date(`${dateStr}T23:59:59.999+07:00`);
+    const effStart = startDateStr || dateStr;
+    const effEnd = endDateStr || dateStr;
+
+    if (effStart && effEnd) {
+      const start = new Date(`${effStart}T00:00:00+07:00`);
+      const end = new Date(`${effEnd}T23:59:59.999+07:00`);
       const dateQuery = {
         $or: [
           { create_dtm: { $gte: start, $lte: end } },
-          { create_dtm: { $regex: `^${dateStr}` } },
+          { create_dtm: { $gte: `${effStart}T00:00:00`, $lte: `${effEnd}T23:59:59.999` } },
+        ],
+      };
+      Object.assign(leadMatch, dateQuery);
+      Object.assign(groupMatch, dateQuery);
+    } else if (effStart) {
+      const start = new Date(`${effStart}T00:00:00+07:00`);
+      const dateQuery = {
+        $or: [
+          { create_dtm: { $gte: start } },
+          { create_dtm: { $gte: `${effStart}T00:00:00` } },
         ],
       };
       Object.assign(leadMatch, dateQuery);
@@ -143,32 +219,45 @@ async function loadData(dateStr?: string, aoId?: string): Promise<{ leads: any[]
       survey_dtm: 1,
       client: 1,
       reff: 1,
+      credit_checking: 1,
+      assign: 1,
+      rekomendasi: 1,
+      source: 1,
+      parent_lead_counter: 1,
+      sales_name: 1,
     };
 
     const [leads, groups, groupSales] = await Promise.all([
       db.collection('leads')
         .find(leadMatch, { projection })
         .sort({ create_dtm: -1 })
-        .limit(dateStr ? 2000 : 500)
+        .limit(effStart ? 2000 : 500)
         .toArray(),
       db.collection('leads_group')
         .find(groupMatch)
         .sort({ create_dtm: -1 })
-        .limit(dateStr ? 1000 : 300)
+        .limit(effStart ? 1000 : 300)
         .toArray(),
       db.collection('leads_group')
-        .find({}, { projection: { 'sales.id': 1, 'sales.name': 1 } })
+        .find({}, { projection: { 'sales.id': 1, 'sales.name': 1, 'sales.branch_name': 1 } })
         .toArray(),
     ]);
 
+    const userDirectory = new Map(loadUserDirectory());
     const aoNames = new Map<string, string>();
     for (const g of groupSales) {
       const id = (g as any).sales?.id;
       const name = ((g as any).sales?.name ?? '').trim();
-      if (id && name) aoNames.set(id, name);
+      const branch = ((g as any).sales?.branch_name ?? '').trim();
+      if (id && name) {
+        aoNames.set(id, name);
+        if (!userDirectory.has(id)) {
+          userDirectory.set(id, { name, branch });
+        }
+      }
     }
 
-    return { leads, groups, aoNames };
+    return { leads, groups, aoNames, userDirectory };
   } catch (err) {
     console.warn('[mongo-daily] live DB failed, fallback to local files:', err);
     const MONGODB_DIR = path.resolve('d:/Project/top-operator/mongodb');
@@ -183,13 +272,20 @@ async function loadData(dateStr?: string, aoId?: string): Promise<{ leads: any[]
           fs.readFileSync(path.join(MONGODB_DIR, 'kospinus001.leads_group.json'), 'utf8'),
         );
       }
+      const userDirectory = new Map(loadUserDirectory());
       const aoNames = new Map<string, string>();
       for (const g of cachedGroups!) {
         const id: string = g.sales?.id;
         const name: string = (g.sales?.name ?? '').trim();
-        if (id && name) aoNames.set(id, name);
+        const branch: string = (g.sales?.branch_name ?? '').trim();
+        if (id && name) {
+          aoNames.set(id, name);
+          if (!userDirectory.has(id)) {
+            userDirectory.set(id, { name, branch });
+          }
+        }
       }
-      return { leads: cachedLeads!, groups: cachedGroups!, aoNames };
+      return { leads: cachedLeads!, groups: cachedGroups!, aoNames, userDirectory };
     }
     throw err;
   }
@@ -423,6 +519,354 @@ function computeGroupSla(
     is_complete: false,
     description: `SLA Berjalan: Menunggu validasi kelompok (berjalan ${formatted_long})`,
   };
+}
+
+// ─── Helpers for Multi-Officer, Timeline, & Notes Spec ───────────────────────
+
+function toTitleCase(str: string): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function formatBranchName(raw: string): string {
+  if (!raw) return 'Depok Sertifikat';
+  const b = raw.trim();
+  if (/^SERTIFIKAT\s+(.+)$/i.test(b)) {
+    const city = b.replace(/^SERTIFIKAT\s+/i, '').trim();
+    return `${toTitleCase(city)} Sertifikat`;
+  }
+  if (/^CABANG\s+(.+)$/i.test(b)) {
+    const name = b.replace(/^CABANG\s+/i, '').trim();
+    return `Cabang ${toTitleCase(name)}`;
+  }
+  if (/^UMI\s+(.+)$/i.test(b)) {
+    const name = b.replace(/^UMI\s+/i, '').trim();
+    return `UMI ${toTitleCase(name)}`;
+  }
+  return toTitleCase(b);
+}
+
+function formatSlaShort(startStr: string | null | undefined, endStr: string | null | undefined): string {
+  if (!startStr) return '-';
+  if (!endStr) return 'Sedang Berjalan';
+  const start = new Date(startStr).getTime();
+  const end = new Date(endStr).getTime();
+  const diffMs = end - start;
+  if (diffMs < 0) return '-';
+  const totalMins = Math.round(diffMs / 60000);
+  if (totalMins < 1) return '< 1m';
+  if (totalMins < 60) return `${totalMins}m`;
+  const hours = Math.floor(totalMins / 60);
+  const remMins = totalMins % 60;
+  if (hours < 24) {
+    return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
+}
+
+function resolveOfficers(
+  l: any,
+  ao_id: string,
+  ao_name: string,
+  branch: string,
+  userDirectory: Map<string, { name: string; branch: string }>
+): OfficerItem[] {
+  const getOfficer = (uid: string, fallbackName: string, keterangan: string): OfficerItem => {
+    const cleanId = (uid || '').trim();
+    const baseId = cleanId.replace(/_(sur|col)$/i, '');
+    const userRec = userDirectory.get(cleanId) || userDirectory.get(baseId);
+
+    let name = userRec?.name || '';
+    if (!name && cleanId === ao_id) {
+      name = ao_name;
+    }
+    if (!name) {
+      if (cleanId.includes('@')) {
+        name = cleanId.split('@')[0].replace(/[._]/g, ' ');
+      } else {
+        name = baseId.replace(/[_-]/g, ' ');
+      }
+    }
+    name = toTitleCase(name || fallbackName);
+
+    const rawBranch = userRec?.branch || branch || 'Depok Sertifikat';
+    const formattedBranch = formatBranchName(rawBranch);
+
+    return {
+      nama_ao: name,
+      username: cleanId || '-',
+      cabang: formattedBranch,
+      keterangan,
+    };
+  };
+
+  const inputUser = l.pemohon?.create_user || l.create_user || ao_id;
+  const officerInput = getOfficer(inputUser, ao_name, 'Input Data Pemohon');
+
+  const slikUser =
+    l.credit_checking?.subbmitted_by ||
+    l.credit_checking?.checked_by ||
+    l.credit_checking?.done_by ||
+    inputUser;
+  const officerSlik = getOfficer(slikUser, ao_name, 'Pengecekan SLIK');
+
+  const surUser =
+    l.assign?.to_surveyor ||
+    l.rekomendasi?.surveyor?.by ||
+    (inputUser ? `${inputUser.replace(/_(sur|col)$/i, '')}_sur` : '-');
+  const officerSurvey = getOfficer(surUser, ao_name, 'Survey');
+
+  return [officerInput, officerSlik, officerSurvey];
+}
+
+function resolveActivitiesTimeline(
+  l: any,
+  status: ActivityStatus,
+  flowStageCode: FlowStageCode
+): ActivityTimelineItem[] {
+  // 1. Input Leads
+  const tInputStart = extractDate(l.create_dtm) || extractDate(l.pemohon?.create_dtm);
+  const tInputEnd =
+    extractDate(l.pengajuan?.create_dtm) ||
+    extractDate(l.credit_checking?.submitted_dtm) ||
+    (l.flg?.completed ? extractDate(l.update_dtm) : null);
+
+  let inputSla = '-';
+  if (tInputStart && tInputEnd) {
+    inputSla = formatSlaShort(tInputStart, tInputEnd);
+  } else if (tInputStart && !tInputEnd) {
+    inputSla =
+      flowStageCode === 'LEADS_INPUT' || flowStageCode === 'LEADS_MANDATORY'
+        ? 'Sedang Berjalan'
+        : 'Selesai';
+  }
+
+  // 2. Cek SLIK
+  const tSlikStart =
+    extractDate(l.credit_checking?.submitted_dtm) ||
+    (l.status?.credit_checking && l.status?.credit_checking !== 'WAITING' ? tInputEnd : null);
+  const tSlikEnd =
+    extractDate(l.credit_checking?.done_dtm) ||
+    extractDate(l.credit_checking?.checked_dtm) ||
+    (l.status?.credit_checking === 'PASSED' || l.status?.credit_checking === 'REJECT'
+      ? extractDate(l.update_dtm)
+      : null);
+
+  let slikSla = '-';
+  if (tSlikStart && tSlikEnd) {
+    slikSla = formatSlaShort(tSlikStart, tSlikEnd);
+  } else if (tSlikStart && !tSlikEnd) {
+    slikSla = 'Sedang Berjalan';
+  }
+
+  // 3. Survey
+  const tSurStart =
+    extractDate(l.credit_checking?.checked_dtm) ||
+    tSlikEnd ||
+    (l.status?.survey && l.status?.survey !== 'WAITING' ? extractDate(l.survey_dtm) : null);
+  const tSurEnd =
+    extractDate(l.survey_dtm) ||
+    (l.status?.survey === 'DONE'
+      ? extractDate(l.rekomendasi?.surveyor?.update_dtm) || extractDate(l.update_dtm)
+      : null);
+
+  let surSla = '-';
+  if (tSurStart && tSurEnd) {
+    surSla = formatSlaShort(tSurStart, tSurEnd);
+  } else if (tSurStart && !tSurEnd) {
+    surSla = flowStageCode === 'SURVEY_IN_PROGRESS' ? 'Sedang Berjalan' : '-';
+  }
+
+  return [
+    {
+      jenis_aktivitas: 'Input Leads',
+      waktu_pencatatan: tInputStart || null,
+      waktu_selesai: tInputEnd || null,
+      sla: inputSla,
+    },
+    {
+      jenis_aktivitas: 'Cek SLIK',
+      waktu_pencatatan: tSlikStart || null,
+      waktu_selesai: tSlikEnd || null,
+      sla: slikSla,
+    },
+    {
+      jenis_aktivitas: 'Survey',
+      waktu_pencatatan: tSurStart || null,
+      waktu_selesai: tSurEnd || null,
+      sla: surSla,
+    },
+  ];
+}
+
+function resolveSalesNotes(
+  l: any,
+  ao_id: string,
+  ao_name: string,
+  userDirectory: Map<string, { name: string; branch: string }>
+): SalesNoteItem[] {
+  const notes: SalesNoteItem[] = [];
+
+  const getUserDisplayName = (uid: string): string => {
+    const cleanId = (uid || '').trim();
+    const baseId = cleanId.replace(/_(sur|col)$/i, '');
+    const userRec = userDirectory.get(cleanId) || userDirectory.get(baseId);
+    let name = userRec?.name || '';
+    if (!name && cleanId === ao_id) name = ao_name;
+    if (!name) {
+      if (cleanId.includes('@')) {
+        name = cleanId.split('@')[0].replace(/[._]/g, ' ');
+      } else {
+        name = baseId.replace(/[_-]/g, ' ');
+      }
+    }
+    name = toTitleCase(name || ao_name);
+    return cleanId ? `${name} (${cleanId})` : name;
+  };
+
+  const inputUser = l.pemohon?.create_user || l.create_user || ao_id;
+  const inputTime = extractDate(l.pengajuan?.create_dtm) || extractDate(l.create_dtm);
+
+  if (l.keterangan?.sales) {
+    notes.push({
+      nama_user: getUserDisplayName(inputUser),
+      catatan: String(l.keterangan.sales).trim(),
+      waktu: inputTime || null,
+    });
+  }
+
+  if (l.rekomendasi?.surveyor?.keterangan) {
+    const surUser = l.assign?.to_surveyor || l.rekomendasi?.surveyor?.by || `${inputUser}_sur`;
+    const surTime = extractDate(l.survey_dtm) || extractDate(l.update_dtm);
+    notes.push({
+      nama_user: getUserDisplayName(surUser),
+      catatan: String(l.rekomendasi.surveyor.keterangan).trim(),
+      waktu: surTime || null,
+    });
+  }
+
+  if (l.rekomendasi?.credit_analyst?.keterangan) {
+    const analystUser = l.rekomendasi.credit_analyst.by || 'Analyst';
+    const analystTime = extractDate(l.update_dtm);
+    notes.push({
+      nama_user: getUserDisplayName(analystUser),
+      catatan: String(l.rekomendasi.credit_analyst.keterangan).trim(),
+      waktu: analystTime || null,
+    });
+  }
+
+  if (notes.length === 0) {
+    const generalNote = typeof l.keterangan === 'string' ? l.keterangan : '';
+    if (generalNote) {
+      notes.push({
+        nama_user: getUserDisplayName(inputUser),
+        catatan: generalNote,
+        waktu: inputTime || null,
+      });
+    }
+  }
+
+  return notes;
+}
+
+function resolveGroupOfficers(
+  g: any,
+  ao_id: string,
+  ao_name: string,
+  branch: string,
+  userDirectory: Map<string, { name: string; branch: string }>
+): OfficerItem[] {
+  const getOfficer = (uid: string, fallbackName: string, keterangan: string): OfficerItem => {
+    const cleanId = (uid || '').trim();
+    const userRec = userDirectory.get(cleanId);
+    let name = userRec?.name || fallbackName;
+    if (!name) {
+      name = cleanId.replace(/[_-]/g, ' ');
+    }
+    name = toTitleCase(name);
+    return {
+      nama_ao: name,
+      username: cleanId || '-',
+      cabang: formatBranchName(branch || userRec?.branch || 'Semua Cabang'),
+      keterangan,
+    };
+  };
+
+  const salesUser = g.sales?.id || g.create_user || ao_id;
+  const officerInput = getOfficer(salesUser, g.sales?.name || ao_name, 'Input Data Pemohon');
+
+  const slikUser = g.assign?.[0]?.create_user || g.create_user || salesUser;
+  const officerSlik = getOfficer(slikUser, g.assign?.[0]?.by || ao_name, 'Pengecekan SLIK');
+
+  const surUser = g.validate?.[0]?.user || (salesUser ? `${salesUser}_sur` : '-');
+  const officerSurvey = getOfficer(surUser, g.validate?.[0]?.by || ao_name, 'Survey');
+
+  return [officerInput, officerSlik, officerSurvey];
+}
+
+function resolveGroupActivitiesTimeline(g: any, isCompleted: boolean): ActivityTimelineItem[] {
+  const tCreate = extractDate(g.create_dtm);
+  const tAssign = extractDate(g.assign?.[0]?.create_dtm) || tCreate;
+  const tPp = extractDate(g.assign?.[0]?.pp_dtm);
+  const tValidate = extractDate(g.validate?.[0]?.dtm) || (isCompleted ? extractDate(g.update_dtm) : null);
+
+  return [
+    {
+      jenis_aktivitas: 'Input Leads',
+      waktu_pencatatan: tCreate || null,
+      waktu_selesai: tAssign || null,
+      sla: tCreate && tAssign ? formatSlaShort(tCreate, tAssign) : 'Selesai',
+    },
+    {
+      jenis_aktivitas: 'Cek SLIK',
+      waktu_pencatatan: tAssign || null,
+      waktu_selesai: tPp || null,
+      sla: tAssign && tPp ? formatSlaShort(tAssign, tPp) : isCompleted ? 'Selesai' : 'Sedang Berjalan',
+    },
+    {
+      jenis_aktivitas: 'Survey',
+      waktu_pencatatan: tPp || tAssign || null,
+      waktu_selesai: tValidate || null,
+      sla: (tPp || tAssign) && tValidate ? formatSlaShort(tPp || tAssign, tValidate) : isCompleted ? 'Selesai' : 'Sedang Berjalan',
+    },
+  ];
+}
+
+function resolveGroupSalesNotes(
+  g: any,
+  ao_id: string,
+  ao_name: string
+): SalesNoteItem[] {
+  const notes: SalesNoteItem[] = [];
+
+  if (Array.isArray(g.validate)) {
+    for (const v of g.validate) {
+      if (v && v.notes) {
+        notes.push({
+          nama_user: v.by || v.user || ao_name,
+          catatan: String(v.notes).trim(),
+          waktu: extractDate(v.dtm) || null,
+        });
+      }
+    }
+  }
+
+  if (g.notes) {
+    notes.unshift({
+      nama_user: g.sales?.name || ao_name,
+      catatan: String(g.notes).trim(),
+      waktu: extractDate(g.create_dtm) || null,
+    });
+  }
+
+  return notes;
 }
 
 // ─── Flow & Status Determination Based on Real Flow & PDF Spec ────────────────
@@ -704,7 +1148,9 @@ function resolveDebiturName(l: any): string {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
-    const dateStr = searchParams.get('date') ?? '';          // YYYY-MM-DD (WIB)
+    const dateStr = searchParams.get('date') ?? '';          // YYYY-MM-DD (WIB) - legacy support
+    const startDateStr = searchParams.get('startDate') ?? searchParams.get('start_date') ?? (dateStr ? dateStr : '');
+    const endDateStr = searchParams.get('endDate') ?? searchParams.get('end_date') ?? (dateStr ? dateStr : '');
     const aoId = searchParams.get('ao') ?? '';
     const kategoriFilter = searchParams.get('kategori') ?? 'all';
     const statusFilter = searchParams.get('status') ?? 'all';
@@ -716,7 +1162,7 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(pageStr, 10));
     const limit = Math.max(5, parseInt(limitStr, 10));
 
-    const { leads, groups, aoNames } = await loadData(dateStr, aoId);
+    const { leads, groups, aoNames, userDirectory } = await loadData(dateStr, aoId, startDateStr, endDateStr);
 
     const activities: ActivityItem[] = [];
 
@@ -725,7 +1171,14 @@ export async function GET(req: NextRequest) {
       const waktu: string = extractDate(l.create_dtm);
       if (!waktu) continue;
 
-      if (dateStr && toLocalDate(waktu) !== dateStr) continue;
+      const localDate = toLocalDate(waktu);
+      if (startDateStr && endDateStr) {
+        if (localDate < startDateStr || localDate > endDateStr) continue;
+      } else if (startDateStr) {
+        if (localDate < startDateStr) continue;
+      } else if (dateStr && localDate !== dateStr) {
+        continue;
+      }
 
       const ao_id: string = l.create_user ?? '';
       if (aoId && ao_id !== aoId) continue;
@@ -799,6 +1252,9 @@ export async function GET(req: NextRequest) {
         nominal,
         source: 'lead',
         sla,
+        officers: resolveOfficers(l, ao_id, ao_name, l.client?.branch_name ?? '', userDirectory),
+        activities_timeline: resolveActivitiesTimeline(l, status, flow_stage.code),
+        sales_notes: resolveSalesNotes(l, ao_id, ao_name, userDirectory),
       });
     }
 
@@ -807,7 +1263,14 @@ export async function GET(req: NextRequest) {
       const waktu: string = extractDate(g.create_dtm);
       if (!waktu) continue;
 
-      if (dateStr && toLocalDate(waktu) !== dateStr) continue;
+      const localDate = toLocalDate(waktu);
+      if (startDateStr && endDateStr) {
+        if (localDate < startDateStr || localDate > endDateStr) continue;
+      } else if (startDateStr) {
+        if (localDate < startDateStr) continue;
+      } else if (dateStr && localDate !== dateStr) {
+        continue;
+      }
 
       const ao_id: string = g.sales?.id ?? '';
       if (aoId && ao_id !== aoId) continue;
@@ -890,6 +1353,9 @@ export async function GET(req: NextRequest) {
         nominal: 0,
         source: 'group',
         sla,
+        officers: resolveGroupOfficers(g, ao_id, ao_name, g.sales?.branch_name ?? '', userDirectory),
+        activities_timeline: resolveGroupActivitiesTimeline(g, isCompleted),
+        sales_notes: resolveGroupSalesNotes(g, ao_id, ao_name),
       });
     }
 

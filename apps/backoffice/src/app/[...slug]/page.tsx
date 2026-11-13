@@ -5,7 +5,12 @@ export const dynamic = 'force-dynamic';
 
 export default function MenuModulePage({ params }: { params: { slug: string[] } }) {
   const slug = params?.slug || [];
-  if (slug.length === 0 || slug[0].startsWith('_') || slug[0] === 'api') {
+  if (
+    slug.length === 0 ||
+    slug[0].startsWith('_') ||
+    slug[0] === 'api' ||
+    slug.some((segment) => segment.includes('.'))
+  ) {
     notFound();
   }
 

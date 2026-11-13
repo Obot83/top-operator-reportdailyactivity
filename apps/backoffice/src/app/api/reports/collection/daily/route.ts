@@ -29,6 +29,29 @@ export type CollectionPaymentRecord = {
   maps_url?: string | null;
 };
 
+export type CollectionDueDebtorRecord = {
+  id: string;
+  contract_id: string;
+  debitur: string;
+  no_hp: string;
+  collector_id?: string;
+  collector_name: string;
+  branch_id?: string;
+  branch_name?: string;
+  alamat_rumah?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  maps_url?: string | null;
+  step_tenor: string; // Tenor (aktif/total), misal: "3/48"
+  tenor: number;
+  total_tagihan: number;
+  telat: number; // DPD
+  bucket: string;
+  status: 'Belum Tagih' | 'Gagal Tagih' | 'Janji Bayar';
+  tgl_jt?: string;
+  notes?: string;
+};
+
 export type CollectionSettlementRecord = {
   id: string;
   date: string;
@@ -55,8 +78,14 @@ export type DailyCollectionData = {
     by_bucket: Array<{ label: string; count: number; nominal: number }>;
     by_collector: Array<{ collector: string; count: number; nominal: number }>;
     by_branch: Array<{ branch: string; count: number; nominal: number }>;
+    totalDueDebitur?: number;
+    totalDueTagihan?: number;
+    dueBelumTagih?: number;
+    dueGagalTagih?: number;
+    dueJanjiBayar?: number;
   };
   payments: CollectionPaymentRecord[];
+  dueDebtors: CollectionDueDebtorRecord[];
   settlements: CollectionSettlementRecord[];
   collectors: Array<{ id: string; name: string }>;
   branches: string[];
@@ -158,14 +187,28 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
         ],
       };
 
-      // Query raw payments, collectors, and settlements in parallel
-      const [rawPayments, rawCollectors, rawSettlements] = await Promise.all([
+      // Query raw payments, collectors, settlements, due debtors (unpaid penagihan list), and MySQL tasks in parallel
+      const [rawPayments, rawCollectors, rawSettlements, rawPenagihan, mysqlTasks] = await Promise.all([
         db.collection('v_backoffice_kolektor_angsuran_tertagih_list').find(dateQuery).toArray(),
         db.collection('v_cbx_kolektor').find().toArray(),
         db
           .collection('vs_kolektor_settlement')
           .find({ 'header.date': { $regex: `^${dateStr}` } })
           .toArray(),
+        db.collection('v_kolektor_penagihan_list').find().toArray().catch(() => []),
+        prisma.collectionTask
+          .findMany({
+            include: {
+              officer: { select: { id: true, name: true } },
+              loanAccount: {
+                include: {
+                  debitur: true,
+                  ptpTrackings: { orderBy: { createdAt: 'desc' } },
+                },
+              },
+            },
+          })
+          .catch(() => []),
       ]);
 
       const collectorMap = new Map<string, string>();
@@ -305,18 +348,34 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
       const totalPages = Math.ceil(totalRecords / limit) || 1;
       const paginatedPayments = filteredPayments.slice((page - 1) * limit, page * limit);
 
-      // Enrich paginated payments with GPS location and home address from MongoDB (contract, leads_surveyor, leads)
+      // Enrich paginated payments & due debtors with GPS location and home address from MongoDB
       let enrichedPayments = paginatedPayments;
+      const dueDebtors: CollectionDueDebtorRecord[] = [];
+      const mysqlTaskMap = new Map((mysqlTasks || []).map((t) => [t.accountNumber, t]));
+      const seenDueContracts = new Set<string>();
+
       try {
-        const contractIds = paginatedPayments.map((p) => p.contract_id).filter(Boolean);
-        if (contractIds.length > 0) {
+        const allNeededContractIds = Array.from(
+          new Set([
+            ...paginatedPayments.map((p) => p.contract_id).filter(Boolean),
+            ...rawPenagihan.map((p: any) => String(p.contract_id ?? '')).filter(Boolean),
+          ])
+        );
+
+        if (allNeededContractIds.length > 0) {
           const contracts = await db
             .collection<any>('contract')
-            .find({ _id: { $in: contractIds } })
+            .find({ _id: { $in: allNeededContractIds } })
             .toArray();
           const contractMap = new Map(contracts.map((c: any) => [String(c._id), c]));
 
-          const leadIds = contracts.map((c: any) => c.lead_id).filter(Boolean);
+          const leadIds = Array.from(
+            new Set([
+              ...contracts.map((c: any) => c.lead_id).filter(Boolean),
+              ...rawPenagihan.map((p: any) => p.lead_id).filter(Boolean),
+            ])
+          );
+
           const [surveyorLeads, regularLeads] = await Promise.all([
             leadIds.length > 0
               ? db
@@ -380,10 +439,175 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
               maps_url,
             };
           });
+
+          // Bangun Daftar Debitur Jatuh Tempo (Hanya yang belum bayar) dari rawPenagihan
+          for (const p of rawPenagihan) {
+            const contractId = String(p.contract_id ?? '-');
+            if (seenDueContracts.has(contractId)) continue;
+            seenDueContracts.add(contractId);
+
+            const collectorId = String(p.collector ?? p.collector_name ?? '');
+            const collectorName =
+              collectorMap.get(collectorId) ??
+              (p.collector_name
+                ? String(p.collector_name)
+                    .replace(/_col$/i, '')
+                    .replace(/_/g, ' ')
+                    .toUpperCase()
+                : 'Tanpa Kolektor');
+            const branchName = String(p.branch_name ?? p.branch_id ?? 'Pusat').trim();
+
+            const totalTagihan = Number(p.total_tagihan) || 0;
+            const telat = Number(p.telat) || 0;
+            const bucket = getDpdBucket(telat);
+
+            const contract = contractMap.get(contractId);
+            const leadId = contract?.lead_id
+              ? String(contract.lead_id)
+              : p.lead_id
+              ? String(p.lead_id)
+              : null;
+            const ls = leadId ? lsMap.get(leadId) : null;
+            const l = leadId ? lMap.get(leadId) : null;
+
+            const rawLat =
+              ls?.pemohon?.domisili?.latitude ??
+              l?.pemohon?.domisili?.latitude ??
+              contract?.alamat?.latitude ??
+              null;
+            const rawLng =
+              ls?.pemohon?.domisili?.longitude ??
+              l?.pemohon?.domisili?.longitude ??
+              contract?.alamat?.longitude ??
+              null;
+
+            const alamatRumah =
+              contract?.alamat?.alamat ||
+              ls?.pemohon?.domisili?.address ||
+              l?.pemohon?.domisili?.address ||
+              (contract?.alamat
+                ? [contract.alamat.kelurahan, contract.alamat.kecamatan, contract.alamat.kota]
+                    .filter(Boolean)
+                    .join(', ')
+                : null);
+
+            const latitude = rawLat != null && !isNaN(Number(rawLat)) ? Number(rawLat) : null;
+            const longitude = rawLng != null && !isNaN(Number(rawLng)) ? Number(rawLng) : null;
+
+            const maps_url =
+              latitude != null && longitude != null
+                ? `https://www.google.com/maps?q=${latitude},${longitude}`
+                : alamatRumah
+                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(alamatRumah)}`
+                : null;
+
+            // Tentukan status: Belum Tagih | Gagal Tagih | Janji Bayar
+            const matchingMysql = mysqlTaskMap.get(contractId);
+            let status: 'Belum Tagih' | 'Gagal Tagih' | 'Janji Bayar' = 'Belum Tagih';
+            if (matchingMysql) {
+              if (
+                matchingMysql.statusBayar === 'JANJI_BAYAR' ||
+                matchingMysql.loanAccount?.ptpTrackings?.some((ptp: any) => ptp.status === 'PENDING')
+              ) {
+                status = 'Janji Bayar';
+              } else if (
+                matchingMysql.statusBayar === 'TIDAK_BISA_BAYAR' ||
+                matchingMysql.statusBayar === 'SUDAH_DIKUNJUNGI'
+              ) {
+                status = 'Gagal Tagih';
+              } else {
+                status = 'Belum Tagih';
+              }
+            } else {
+              const notesLower = String(p.notes || '').toLowerCase();
+              if (notesLower.includes('janji') || notesLower.includes('ptp')) {
+                status = 'Janji Bayar';
+              } else if (telat > 30) {
+                status = 'Gagal Tagih';
+              } else if (telat > 14) {
+                status = 'Janji Bayar';
+              } else {
+                status = 'Belum Tagih';
+              }
+            }
+
+            dueDebtors.push({
+              id: p._id ? String(p._id) : `due-${contractId}`,
+              contract_id: contractId,
+              debitur: String(p.name ?? p.debitur ?? '-'),
+              no_hp: String(p.no_hp ?? '-'),
+              collector_id: collectorId,
+              collector_name: collectorName,
+              branch_id: String(p.branch_id ?? ''),
+              branch_name: branchName,
+              alamat_rumah: alamatRumah,
+              latitude,
+              longitude,
+              maps_url,
+              step_tenor: String(p.completed_tenor ?? `${p.angs_ke ?? 1}/${p.tenor ?? 1}`),
+              tenor: Number(p.tenor) || 0,
+              total_tagihan: totalTagihan,
+              telat,
+              bucket,
+              status,
+              tgl_jt: p.tgl_jt ? String(p.tgl_jt) : undefined,
+              notes: p.notes ? String(p.notes) : undefined,
+            });
+          }
         }
       } catch (enrichErr) {
-        console.error('Error enriching payments with GPS:', enrichErr);
+        console.error('Error enriching payments & due debtors with GPS:', enrichErr);
       }
+
+      // Tambahkan rekening MySQL yang belum bayar jika belum ada di list
+      for (const task of mysqlTasks || []) {
+        if (task.statusBayar !== 'SUDAH_BAYAR' && !seenDueContracts.has(task.accountNumber)) {
+          seenDueContracts.add(task.accountNumber);
+          const loan = task.loanAccount;
+          const deb = loan.debitur;
+          const total = Number(task.tagihanPokok) + Number(task.tagihanBunga) + Number(task.tagihanDenda);
+          let st: 'Belum Tagih' | 'Gagal Tagih' | 'Janji Bayar' = 'Belum Tagih';
+          if (
+            task.statusBayar === 'JANJI_BAYAR' ||
+            loan.ptpTrackings?.some((ptp: any) => ptp.status === 'PENDING')
+          ) {
+            st = 'Janji Bayar';
+          } else if (task.statusBayar === 'TIDAK_BISA_BAYAR' || task.statusBayar === 'SUDAH_DIKUNJUNGI') {
+            st = 'Gagal Tagih';
+          }
+          dueDebtors.push({
+            id: task.id,
+            contract_id: task.accountNumber,
+            debitur: deb.name,
+            no_hp: deb.phone || '-',
+            collector_id: task.officerId,
+            collector_name: task.officer.name,
+            branch_id: task.loanAccount.branchId,
+            branch_name: 'Cabang Utama',
+            alamat_rumah: deb.domisiliAddress,
+            latitude: deb.defaultLatitude,
+            longitude: deb.defaultLongitude,
+            maps_url:
+              deb.defaultLatitude != null && deb.defaultLongitude != null
+                ? `https://www.google.com/maps?q=${deb.defaultLatitude},${deb.defaultLongitude}`
+                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deb.domisiliAddress)}`,
+            step_tenor: `1/${loan.tenorMinggu}`,
+            tenor: loan.tenorMinggu,
+            total_tagihan: total,
+            telat: loan.dpd,
+            bucket: getDpdBucket(loan.dpd),
+            status: st,
+          });
+        }
+      }
+
+      dueDebtors.sort((a, b) => b.telat - a.telat);
+
+      const totalDueDebitur = dueDebtors.length;
+      const totalDueTagihan = dueDebtors.reduce((acc, d) => acc + d.total_tagihan, 0);
+      const dueBelumTagih = dueDebtors.filter((d) => d.status === 'Belum Tagih').length;
+      const dueGagalTagih = dueDebtors.filter((d) => d.status === 'Gagal Tagih').length;
+      const dueJanjiBayar = dueDebtors.filter((d) => d.status === 'Janji Bayar').length;
 
       // Compatibility: Collector Summaries
       const collectorSummaryMap = new Map<string, any>();
@@ -442,8 +666,14 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
             by_bucket,
             by_collector,
             by_branch,
+            totalDueDebitur,
+            totalDueTagihan,
+            dueBelumTagih,
+            dueGagalTagih,
+            dueJanjiBayar,
           },
           payments: enrichedPayments,
+          dueDebtors,
           settlements,
           collectors: collectorsList,
           branches: Array.from(branchesSet).sort(),
@@ -473,11 +703,54 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
           officer: { select: { id: true, name: true } },
           loanAccount: {
             include: {
-              debitur: { select: { name: true, phone: true } },
+              debitur: true,
+              ptpTrackings: { orderBy: { createdAt: 'desc' } },
             },
           },
         },
       });
+
+      const unpaidTasks = tasks.filter((t) => t.statusBayar !== 'SUDAH_BAYAR');
+      const fallbackDueDebtors: CollectionDueDebtorRecord[] = unpaidTasks.map((task) => {
+        const loan = task.loanAccount;
+        const deb = loan.debitur;
+        const total = Number(task.tagihanPokok) + Number(task.tagihanBunga) + Number(task.tagihanDenda);
+        let st: 'Belum Tagih' | 'Gagal Tagih' | 'Janji Bayar' = 'Belum Tagih';
+        if (task.statusBayar === 'JANJI_BAYAR' || loan.ptpTrackings?.some((ptp: any) => ptp.status === 'PENDING')) {
+          st = 'Janji Bayar';
+        } else if (task.statusBayar === 'TIDAK_BISA_BAYAR' || task.statusBayar === 'SUDAH_DIKUNJUNGI') {
+          st = 'Gagal Tagih';
+        }
+        return {
+          id: task.id,
+          contract_id: task.accountNumber,
+          debitur: deb.name,
+          no_hp: deb.phone || '-',
+          collector_id: task.officerId,
+          collector_name: task.officer.name,
+          branch_id: task.loanAccount.branchId,
+          branch_name: 'Cabang Utama',
+          alamat_rumah: deb.domisiliAddress,
+          latitude: deb.defaultLatitude,
+          longitude: deb.defaultLongitude,
+          maps_url:
+            deb.defaultLatitude != null && deb.defaultLongitude != null
+              ? `https://www.google.com/maps?q=${deb.defaultLatitude},${deb.defaultLongitude}`
+              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deb.domisiliAddress)}`,
+          step_tenor: `1/${loan.tenorMinggu}`,
+          tenor: loan.tenorMinggu,
+          total_tagihan: total,
+          telat: loan.dpd,
+          bucket: getDpdBucket(loan.dpd),
+          status: st,
+        };
+      });
+
+      const totalDueDebitur = fallbackDueDebtors.length;
+      const totalDueTagihan = fallbackDueDebtors.reduce((acc, d) => acc + d.total_tagihan, 0);
+      const dueBelumTagih = fallbackDueDebtors.filter((d) => d.status === 'Belum Tagih').length;
+      const dueGagalTagih = fallbackDueDebtors.filter((d) => d.status === 'Gagal Tagih').length;
+      const dueJanjiBayar = fallbackDueDebtors.filter((d) => d.status === 'Janji Bayar').length;
 
       return NextResponse.json({
         success: true,
@@ -496,8 +769,14 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
             by_bucket: [],
             by_collector: [],
             by_branch: [],
+            totalDueDebitur,
+            totalDueTagihan,
+            dueBelumTagih,
+            dueGagalTagih,
+            dueJanjiBayar,
           },
           payments: [],
+          dueDebtors: fallbackDueDebtors,
           settlements: [],
           collectors: [],
           branches: [],
