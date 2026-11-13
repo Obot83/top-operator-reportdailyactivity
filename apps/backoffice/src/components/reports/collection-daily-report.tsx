@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -18,6 +18,8 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   TrendingUp,
   UserCheck,
   MapPin,
@@ -98,6 +100,13 @@ export function CollectionDailyReport() {
   const [dueStatusFilter, setDueStatusFilter] = useState<'all' | 'Belum Tagih' | 'Gagal Tagih' | 'Janji Bayar'>('all');
   const [dueSearchQuery, setDueSearchQuery] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | PaymentStatusType>('all');
+  const [expandedCollectorIds, setExpandedCollectorIds] = useState<string[]>([]);
+
+  function toggleCollectorExpand(collectorId: string) {
+    setExpandedCollectorIds((prev) =>
+      prev.includes(collectorId) ? prev.filter((id) => id !== collectorId) : [...prev, collectorId]
+    );
+  }
 
   // Query daily collection data
   const { data, isLoading, error, refetch, isFetching } = useQuery({
@@ -1124,57 +1133,162 @@ export function CollectionDailyReport() {
       {/* ── Tab 2: Rekap Performa per Kolektor ───────────────── */}
       {!isLoading && !error && activeTab === 'collectors' && (
         <section className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {data?.collectorSummaries?.map((col) => (
-              <div key={col.collectorId} className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
-                <div className="flex items-start justify-between border-b border-border/60 pb-3">
-                  <div>
-                    <h3 className="font-semibold text-foreground">{col.collectorName}</h3>
-                    <p className="text-xs text-muted-foreground font-mono">ID: {col.collectorId}</p>
-                  </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {col.totals.totalDebitur} Debitur
-                  </span>
-                </div>
+          {(!data?.collectorSummaries || data.collectorSummaries.length === 0) ? (
+            <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
+              <p className="font-semibold text-sm">Tidak ada data performa kolektor pada tanggal {date}</p>
+              <p className="text-xs text-muted-foreground">Belum ada catatan penerimaan angsuran untuk kolektor pada tanggal ini.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 border-b border-border/80 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <tr>
+                      <th className="px-3.5 py-3 w-10 text-center">No</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Petugas Kolektor</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Cabang</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Debitur Tertagih</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Total Tagihan</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Total Realisasi</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Rincian Debitur</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {data.collectorSummaries.map((col, idx) => {
+                      const totalTagihanCol = col.tasks.reduce((sum, t) => sum + (t.totalTagihan || 0), 0);
+                      const branchName = col.tasks[0]?.branchName && col.tasks[0]?.branchName !== '-' ? col.tasks[0].branchName : 'Pusat';
+                      const isExpanded = expandedCollectorIds.includes(col.collectorId);
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded-lg bg-muted/30 p-2.5">
-                    <span className="text-muted-foreground">Total Realisasi</span>
-                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
-                      {formatRupiah(col.totals.totalRealisasi)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg bg-muted/30 p-2.5">
-                    <span className="text-muted-foreground">Rata-rata/Debitur</span>
-                    <p className="text-sm font-bold text-foreground font-mono mt-0.5">
-                      {col.totals.totalDebitur > 0
-                        ? formatRupiah(Math.round(col.totals.totalRealisasi / col.totals.totalDebitur))
-                        : 'Rp 0'}
-                    </p>
-                  </div>
-                </div>
+                      return (
+                        <Fragment key={col.collectorId}>
+                          <tr className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
+                            <td className="px-3.5 py-3 text-center font-mono text-muted-foreground">
+                              {idx + 1}
+                            </td>
+                            <td className="px-3.5 py-3">
+                              <p className="font-semibold text-foreground text-xs">{col.collectorName}</p>
+                              <p className="text-[11px] text-muted-foreground font-mono mt-0.5">ID: {col.collectorId}</p>
+                            </td>
+                            <td className="px-3.5 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                              {branchName}
+                            </td>
+                            <td className="px-3.5 py-3 text-center">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                <CheckCircle2 className="h-3 w-3" />
+                                {col.totals.totalDebitur} debitur
+                              </span>
+                            </td>
+                            <td className="px-3.5 py-3 text-right font-mono text-xs text-muted-foreground">
+                              {formatRupiah(totalTagihanCol)}
+                            </td>
+                            <td className="px-3.5 py-3 text-right font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
+                              {formatRupiah(col.totals.totalRealisasi)}
+                            </td>
+                            <td className="px-3.5 py-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => toggleCollectorExpand(col.collectorId)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-border bg-card hover:bg-muted text-[11px] font-medium text-foreground transition-colors"
+                              >
+                                <span>{isExpanded ? 'Tutup' : 'Lihat'} ({col.tasks.length})</span>
+                                {isExpanded ? (
+                                  <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </button>
+                            </td>
+                          </tr>
 
-                {/* Mini list of contracts */}
-                <div className="space-y-1.5 pt-1">
-                  <p className="text-xs font-semibold text-muted-foreground">Daftar Debitur Tertagih:</p>
-                  <div className="max-h-36 overflow-y-auto divide-y divide-border/60 text-xs rounded border border-border/50">
-                    {col.tasks.map((t) => (
-                      <div key={t.id} className="p-2 flex items-center justify-between hover:bg-muted/20">
-                        <div>
-                          <p className="font-medium text-foreground">{t.debiturName}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">{t.accountNumber}</p>
-                        </div>
-                        <span className="font-semibold text-emerald-600 font-mono">
-                          {formatRupiah(t.nominalDibayar)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                          {/* Expanded Debtor List */}
+                          {isExpanded && (
+                            <tr className="bg-muted/30">
+                              <td colSpan={7} className="px-4 py-3">
+                                <div className="rounded-lg border border-border/80 bg-card overflow-hidden">
+                                  <div className="bg-muted/40 px-3.5 py-2 border-b border-border/60 flex items-center justify-between text-xs font-semibold">
+                                    <span>Daftar Debitur Tertagih — {col.collectorName}</span>
+                                    <span className="text-muted-foreground font-normal">
+                                      Total {col.tasks.length} transaksi ({formatRupiah(col.totals.totalRealisasi)})
+                                    </span>
+                                  </div>
+                                  <table className="w-full text-xs">
+                                    <thead className="bg-muted/20 border-b border-border/60 text-left text-[11px] font-medium text-muted-foreground uppercase">
+                                      <tr>
+                                        <th className="px-3 py-2">No. Kontrak</th>
+                                        <th className="px-3 py-2">Debitur</th>
+                                        <th className="px-3 py-2 text-center">Tenor</th>
+                                        <th className="px-3 py-2 text-center">DPD</th>
+                                        <th className="px-3 py-2 text-right">Total Tagihan</th>
+                                        <th className="px-3 py-2 text-right">Nominal Dibayar</th>
+                                        <th className="px-3 py-2 text-center">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border/40">
+                                      {col.tasks.map((t) => (
+                                        <tr key={t.id} className="hover:bg-muted/20">
+                                          <td className="px-3 py-2 font-mono text-[11px] font-semibold text-primary">
+                                            <Link
+                                              href={`/dashboard/debitur/${encodeURIComponent(t.accountNumber)}`}
+                                              className="hover:underline inline-flex items-center gap-1 group"
+                                              title="Buka Debitur Card"
+                                            >
+                                              <span>{t.accountNumber}</span>
+                                              <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100" />
+                                            </Link>
+                                          </td>
+                                          <td className="px-3 py-2 text-[11px] font-medium text-foreground">
+                                            {t.debiturName}
+                                          </td>
+                                          <td className="px-3 py-2 text-center font-mono text-[11px] text-muted-foreground">
+                                            {t.stepTenor}
+                                          </td>
+                                          <td className="px-3 py-2 text-center font-mono text-[11px] text-muted-foreground">
+                                            {t.dpd} hr
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-mono text-[11px] text-muted-foreground">
+                                            {formatRupiah(t.totalTagihan)}
+                                          </td>
+                                          <td className="px-3 py-2 text-right font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                            {formatRupiah(t.nominalDibayar)}
+                                          </td>
+                                          <td className="px-3 py-2 text-center">
+                                            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                                              {t.statusBayarLabel || 'Sudah Bayar'}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-muted/60 border-t-2 border-border font-semibold text-xs">
+                    <tr>
+                      <td colSpan={3} className="px-3.5 py-3 text-foreground">
+                        Total {data.collectorSummaries.length} Petugas Kolektor
+                      </td>
+                      <td className="px-3.5 py-3 text-center font-mono text-emerald-700 dark:text-emerald-400">
+                        {data.collectorSummaries.reduce((sum, c) => sum + c.totals.totalDebitur, 0)} debitur
+                      </td>
+                      <td className="px-3.5 py-3 text-right font-mono text-muted-foreground">
+                        {formatRupiah(data.collectorSummaries.reduce((sum, c) => sum + c.tasks.reduce((s, t) => s + (t.totalTagihan || 0), 0), 0))}
+                      </td>
+                      <td className="px-3.5 py-3 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatRupiah(data.collectorSummaries.reduce((sum, c) => sum + c.totals.totalRealisasi, 0))}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </section>
       )}
 
