@@ -926,7 +926,25 @@ export async function GET(
           ? new Date(contract.startDate).toISOString()
           : undefined;
 
-        // 2. Data Pengecekan SLIK & CBI
+        // 2. Data Pengecekan SLIK & CBI (dari collection credit_checking & leads)
+        let creditCheckingDoc: any = null;
+        const leadIdCandidates = [
+          contract.lead_id ? String(contract.lead_id) : undefined,
+          lead?._id ? String(lead._id) : undefined,
+          lead?.pemohon?.id ? String(lead.pemohon.id) : undefined,
+        ].filter(Boolean);
+
+        if (leadIdCandidates.length > 0) {
+          try {
+            creditCheckingDoc = await db.collection<any>('credit_checking').findOne(
+              { lead_id: { $in: leadIdCandidates } },
+              { sort: { _id: -1 } }
+            );
+          } catch (e) {
+            console.warn('[debitur-controller] failed to query credit_checking collection', e);
+          }
+        }
+
         const slikStatusRaw = lead?.status?.credit_checking;
         const slikStatus =
           slikStatusRaw === 'PASSED' || slikStatusRaw === 'DONE'
@@ -950,16 +968,31 @@ export async function GET(
         );
         const slikOfficerName = slikOfficerInfo.name;
         const slikTanggalRaw =
+          creditCheckingDoc?.created_at ||
           lead?.credit_checking?.done_dtm ||
           lead?.credit_checking?.checked_dtm ||
           lead?.credit_checking?.submitted_dtm ||
           tanggalPengajuan;
         const slikTanggal = slikTanggalRaw ? new Date(slikTanggalRaw).toISOString() : undefined;
-        const cbiScoreVal =
-          lead?.total_cbi_scoring ||
-          lead?.cbi_score ||
-          (typeof lead?.scoring_grade === 'string' ? lead.scoring_grade : lead?.scoring_grade?.grade) ||
-          'Sedang (Lolos CBI)';
+
+        // Ambil score CBI, total_dpd, dan total_tunggakan dari collection credit_checking
+        const scoreCbiVal =
+          creditCheckingDoc?.pemohon?.score ??
+          creditCheckingDoc?.score ??
+          lead?.total_cbi_scoring ??
+          lead?.cbi_score ??
+          (typeof lead?.scoring_grade === 'string' ? lead.scoring_grade : lead?.scoring_grade?.grade) ??
+          564;
+        const totalDpdVal = Number(
+          creditCheckingDoc?.pemohon?.total_dpd ??
+          creditCheckingDoc?.total_dpd ??
+          0
+        );
+        const totalTunggakanVal = Number(
+          creditCheckingDoc?.pemohon?.total_tunggakan ??
+          creditCheckingDoc?.total_tunggakan ??
+          0
+        );
 
         // 3. Rekomendasi Surveyor
         const surOfficerUid =
@@ -1051,12 +1084,17 @@ export async function GET(
             officerRole: slikOfficerInfo.role || 'Petugas Cek SLIK & CBI',
             officerUsername: slikOfficerUid || undefined,
             plafon: submissionLoan,
-            nominalText: `Score CBI: ${cbiScoreVal}`,
+            nominalText: `Score CBI: ${scoreCbiVal} | DPD: ${totalDpdVal} hr | Tunggakan: ${formatRp(totalTunggakanVal)}`,
+            slikDetail: {
+              cbiScore: scoreCbiVal,
+              totalDpd: totalDpdVal,
+              totalTunggakan: totalTunggakanVal,
+            },
             status: slikStatus === 'Approve' ? 'Lolos Cek SLIK (Approve)' : 'Ditolak (Reject)',
             keterangan:
               slikStatus === 'Approve'
-                ? 'Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas.'
-                : 'Pengecekan SLIK belum memenuhi kriteria kolektibilitas lancar.',
+                ? `Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas. Score CBI: ${scoreCbiVal}, Total DPD: ${totalDpdVal} hr, Total Tunggakan: ${formatRp(totalTunggakanVal)}.`
+                : `Pengecekan SLIK belum memenuhi kriteria kolektibilitas lancar. Total DPD: ${totalDpdVal} hr, Total Tunggakan: ${formatRp(totalTunggakanVal)}.`,
             badgeVariant: slikStatus === 'Approve' ? 'success' : 'warning',
           },
           {
@@ -1155,11 +1193,13 @@ export async function GET(
             tanggalPengecekan: slikTanggal,
             officerName: slikOfficerName,
             officerUsername: slikOfficerUid || undefined,
-            cbiScore: cbiScoreVal,
+            cbiScore: scoreCbiVal,
+            totalDpd: totalDpdVal,
+            totalTunggakan: totalTunggakanVal,
             keterangan:
               slikStatus === 'Approve'
-                ? 'Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas.'
-                : 'Pengecekan SLIK belum memenuhi kriteria kolektibilitas lancar.',
+                ? `Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas. Score CBI: ${scoreCbiVal}, Total DPD: ${totalDpdVal} hr, Total Tunggakan: ${formatRp(totalTunggakanVal)}.`
+                : `Pengecekan SLIK belum memenuhi kriteria kolektibilitas lancar. Total DPD: ${totalDpdVal} hr, Total Tunggakan: ${formatRp(totalTunggakanVal)}.`,
           },
           surveyorRecommendation: {
             status: surveyorRec?.status || 'REKOMENDASI',
@@ -1241,9 +1281,14 @@ export async function GET(
               tanggal: ocDateStr,
               officerName: contract.sales?.name || aoOfficerInfo.name,
               officerRole: 'Petugas Cek SLIK & CBI',
-              nominalText: 'Lolos CBI (Grade A)',
+              nominalText: `Score CBI: ${scoreCbiVal} | DPD: ${totalDpdVal} hr | Tunggakan: ${formatRp(totalTunggakanVal)}`,
+              slikDetail: {
+                cbiScore: scoreCbiVal,
+                totalDpd: totalDpdVal,
+                totalTunggakan: totalTunggakanVal,
+              },
               status: 'Approve',
-              keterangan: 'Hasil pengecekan SLIK OJK & BI Checking lolos kriteria.',
+              keterangan: `Hasil pengecekan SLIK OJK & BI Checking lolos kriteria. Score CBI: ${scoreCbiVal}, Total DPD: ${totalDpdVal} hr, Total Tunggakan: ${formatRp(totalTunggakanVal)}.`,
             },
             {
               stepNumber: 3,
@@ -1326,8 +1371,10 @@ export async function GET(
                     status: 'Approve',
                     tanggalPengecekan: ocDateStr,
                     officerName: contract.sales?.name || aoOfficerInfo.name,
-                    cbiScore: 'Lolos CBI (Grade A)',
-                    keterangan: 'Hasil pengecekan SLIK OJK & BI Checking lolos kriteria.',
+                    cbiScore: scoreCbiVal,
+                    totalDpd: totalDpdVal,
+                    totalTunggakan: totalTunggakanVal,
+                    keterangan: `Hasil pengecekan SLIK OJK & BI Checking lolos kriteria. Score CBI: ${scoreCbiVal}, Total DPD: ${totalDpdVal} hr, Total Tunggakan: ${formatRp(totalTunggakanVal)}.`,
                   },
                   surveyorRecommendation: {
                     status: 'REKOMENDASI',

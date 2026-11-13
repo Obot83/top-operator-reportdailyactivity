@@ -1310,13 +1310,16 @@ function ContractAnalysisDetail({
             officerName: creditCapacity?.slikChecking?.officerName || creditCapacity?.aoName || 'Petugas Cek SLIK',
             officerRole: 'Petugas Cek SLIK & CBI',
             officerUsername: creditCapacity?.slikChecking?.officerUsername,
-            nominalText: creditCapacity?.slikChecking?.cbiScore
-              ? `Score CBI: ${creditCapacity.slikChecking.cbiScore}`
-              : 'Lolos CBI (Grade A)',
+            nominalText: `Score CBI: ${creditCapacity?.slikChecking?.cbiScore ?? 564} | DPD: ${creditCapacity?.slikChecking?.totalDpd ?? 0} hr | Tunggakan: ${formatRupiah(creditCapacity?.slikChecking?.totalTunggakan ?? 0)}`,
+            slikDetail: {
+              cbiScore: creditCapacity?.slikChecking?.cbiScore ?? 564,
+              totalDpd: creditCapacity?.slikChecking?.totalDpd ?? 0,
+              totalTunggakan: creditCapacity?.slikChecking?.totalTunggakan ?? 0,
+            },
             status: creditCapacity?.slikChecking?.status || 'Approve',
             keterangan:
               creditCapacity?.slikChecking?.keterangan ||
-              'Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas.',
+              `Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas. Score CBI: ${creditCapacity?.slikChecking?.cbiScore ?? 564}, Total DPD: ${creditCapacity?.slikChecking?.totalDpd ?? 0} hr, Total Tunggakan: ${formatRupiah(creditCapacity?.slikChecking?.totalTunggakan ?? 0)}.`,
           },
           {
             stepNumber: 3,
@@ -1499,7 +1502,39 @@ function ContractAnalysisDetail({
                     )}
                   </td>
                   <td className="py-3 px-3 text-right font-mono font-medium text-foreground whitespace-nowrap align-top">
-                    {s.nominalText || (s.plafon ? `${formatRupiah(s.plafon)} (${s.tenor} ${tenorUnit})` : '-')}
+                    {s.stepKey === 'CEK_SLIK' && s.slikDetail ? (
+                      <div className="space-y-0.5 text-right font-mono text-[11px]">
+                        <div className="font-semibold text-foreground">
+                          Score CBI: <span className="text-primary font-bold">{s.slikDetail.cbiScore}</span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          Total DPD:{' '}
+                          <span
+                            className={
+                              s.slikDetail.totalDpd > 0
+                                ? 'text-destructive font-semibold'
+                                : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                            }
+                          >
+                            {s.slikDetail.totalDpd} hr
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          Total Tunggakan:{' '}
+                          <span
+                            className={
+                              s.slikDetail.totalTunggakan > 0
+                                ? 'text-destructive font-semibold'
+                                : 'text-foreground font-medium'
+                            }
+                          >
+                            {formatRupiah(s.slikDetail.totalTunggakan)}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      s.nominalText || (s.plafon ? `${formatRupiah(s.plafon)} (${s.tenor} ${tenorUnit})` : '-')
+                    )}
                   </td>
                   <td className="py-3 px-3 text-center whitespace-nowrap align-top">
                     <Badge variant={getStepStatusBadgeVariant(s.status)} className="text-[10px] py-0.5 px-2">

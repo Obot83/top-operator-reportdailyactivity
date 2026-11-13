@@ -167,6 +167,8 @@ export interface DebtorCreditCapacity {
     officerName?: string;
     officerUsername?: string;
     cbiScore?: string | number;
+    totalDpd?: number;
+    totalTunggakan?: number;
     keterangan?: string;
   };
   surveyorRecommendation?: {
@@ -222,6 +224,11 @@ export interface LoanProcessStep {
   tenor?: number;
   tenorType?: string;
   nominalText?: string;
+  slikDetail?: {
+    cbiScore: number | string;
+    totalDpd: number;
+    totalTunggakan: number;
+  };
   status: string;
   keterangan?: string;
   badgeVariant?: 'default' | 'success' | 'warning' | 'info' | 'secondary';
