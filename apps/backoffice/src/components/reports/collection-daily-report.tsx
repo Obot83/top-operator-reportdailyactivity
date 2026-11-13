@@ -89,7 +89,8 @@ function getBadgeVariant(bucket: string) {
 }
 
 export function CollectionDailyReport() {
-  const [date, setDate] = useState('2026-10-01');
+  const [startDate, setStartDate] = useState('2026-10-01');
+  const [endDate, setEndDate] = useState('2026-10-01');
   const [selectedCollector, setSelectedCollector] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedBucket, setSelectedBucket] = useState('all');
@@ -102,6 +103,8 @@ export function CollectionDailyReport() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | PaymentStatusType>('all');
   const [expandedCollectorIds, setExpandedCollectorIds] = useState<string[]>([]);
 
+  const dateRangeLabel = startDate === endDate ? startDate : `${startDate} s/d ${endDate}`;
+
   function toggleCollectorExpand(collectorId: string) {
     setExpandedCollectorIds((prev) =>
       prev.includes(collectorId) ? prev.filter((id) => id !== collectorId) : [...prev, collectorId]
@@ -110,10 +113,12 @@ export function CollectionDailyReport() {
 
   // Query daily collection data
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['collection-daily', date, selectedCollector, selectedBranch, selectedBucket, paymentStatusFilter, searchQuery, page, limit],
+    queryKey: ['collection-daily', startDate, endDate, selectedCollector, selectedBranch, selectedBucket, paymentStatusFilter, searchQuery, page, limit],
     queryFn: async (): Promise<DailyCollectionData> => {
       const params = new URLSearchParams({
-        date,
+        startDate,
+        endDate,
+        date: startDate,
         collector: selectedCollector,
         branch: selectedBranch,
         bucket: selectedBucket,
@@ -160,6 +165,8 @@ export function CollectionDailyReport() {
   });
 
   function resetFilters() {
+    setStartDate('2026-10-01');
+    setEndDate('2026-10-01');
     setSelectedCollector('all');
     setSelectedBranch('all');
     setSelectedBucket('all');
@@ -207,7 +214,7 @@ export function CollectionDailyReport() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `debitur-jatuh-tempo-${date}.csv`;
+    link.download = `debitur-jatuh-tempo-${startDate === endDate ? startDate : `${startDate}_${endDate}`}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -255,7 +262,7 @@ export function CollectionDailyReport() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `daily-collection-${date}.csv`;
+    link.download = `daily-collection-${startDate === endDate ? startDate : `${startDate}_${endDate}`}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -278,11 +285,12 @@ export function CollectionDailyReport() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {data?.latestActivityDate && data.latestActivityDate !== date && (
+          {data?.latestActivityDate && (data.latestActivityDate !== startDate || data.latestActivityDate !== endDate) && (
             <button
               type="button"
               onClick={() => {
-                setDate(data.latestActivityDate);
+                setStartDate(data.latestActivityDate);
+                setEndDate(data.latestActivityDate);
                 setPage(1);
               }}
               className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300 transition-colors"
@@ -316,21 +324,61 @@ export function CollectionDailyReport() {
 
       {/* ── Filter Bar ──────────────────────────────────────── */}
       <section className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {/* Tanggal */}
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-3 w-3" /> Tanggal Tagih/Bayar
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
-                setPage(1);
-              }}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono"
-            />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          {/* Tanggal Tagih / Bayar (Range) */}
+          <div className="sm:col-span-2 lg:col-span-2">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3 w-3" /> Tanggal Tagih/Bayar (Range)
+              </label>
+              {(startDate !== '2026-10-01' || endDate !== '2026-10-01') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('2026-10-01');
+                    setEndDate('2026-10-01');
+                    setPage(1);
+                  }}
+                  className="text-[11px] text-primary hover:underline font-semibold"
+                >
+                  Reset Tanggal
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setStartDate(val);
+                    if (endDate && val > endDate) {
+                      setEndDate(val);
+                    }
+                    setPage(1);
+                  }}
+                  title="Dari Tanggal"
+                  className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+              <div className="relative">
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEndDate(val);
+                    if (startDate && val < startDate) {
+                      setStartDate(val);
+                    }
+                    setPage(1);
+                  }}
+                  title="Sampai Tanggal"
+                  className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Kolektor */}
@@ -420,9 +468,9 @@ export function CollectionDailyReport() {
           </div>
         </div>
 
-        {(selectedCollector !== 'all' || selectedBranch !== 'all' || selectedBucket !== 'all' || searchQuery || paymentStatusFilter !== 'all') && (
+        {(startDate !== '2026-10-01' || endDate !== '2026-10-01' || selectedCollector !== 'all' || selectedBranch !== 'all' || selectedBucket !== 'all' || searchQuery || paymentStatusFilter !== 'all') && (
           <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
-            <span>Filter aktif diterapkan</span>
+            <span>Filter aktif diterapkan: <strong className="text-foreground">{dateRangeLabel}</strong></span>
             <button
               type="button"
               onClick={resetFilters}
@@ -618,15 +666,16 @@ export function CollectionDailyReport() {
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Calendar className="h-6 w-6" />
           </div>
-          <h3 className="text-base font-semibold">Tidak ada transaksi penagihan pada tanggal {date}</h3>
+          <h3 className="text-base font-semibold">Tidak ada transaksi penagihan pada periode {dateRangeLabel}</h3>
           <p className="mx-auto max-w-md text-sm text-muted-foreground">
-            Tidak ditemukan catatan pembayaran angsuran untuk filter yang dipilih. Silakan ubah tanggal atau filter di atas.
+            Tidak ditemukan catatan pembayaran angsuran untuk filter yang dipilih. Silakan ubah rentang tanggal atau filter di atas.
           </p>
-          {data?.latestActivityDate && data.latestActivityDate !== date && (
+          {data?.latestActivityDate && (data.latestActivityDate !== startDate || data.latestActivityDate !== endDate) && (
             <button
               type="button"
               onClick={() => {
-                setDate(data.latestActivityDate);
+                setStartDate(data.latestActivityDate);
+                setEndDate(data.latestActivityDate);
                 setPage(1);
               }}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
@@ -1135,8 +1184,8 @@ export function CollectionDailyReport() {
         <section className="space-y-4">
           {(!data?.collectorSummaries || data.collectorSummaries.length === 0) ? (
             <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
-              <p className="font-semibold text-sm">Tidak ada data performa kolektor pada tanggal {date}</p>
-              <p className="text-xs text-muted-foreground">Belum ada catatan penerimaan angsuran untuk kolektor pada tanggal ini.</p>
+              <p className="font-semibold text-sm">Tidak ada data performa kolektor pada periode {dateRangeLabel}</p>
+              <p className="text-xs text-muted-foreground">Belum ada catatan penerimaan angsuran untuk kolektor pada periode ini.</p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
@@ -1300,7 +1349,7 @@ export function CollectionDailyReport() {
               <div>
                 <h3 className="font-semibold text-sm">Bukti Setoran Kas (Settlement Slip)</h3>
                 <p className="text-xs text-muted-foreground">
-                  Rekonsiliasi slip setoran kas kolektor ke cabang pada tanggal {date}
+                  Rekonsiliasi slip setoran kas kolektor ke cabang pada periode {dateRangeLabel}
                 </p>
               </div>
               <div className="text-right">
@@ -1313,7 +1362,7 @@ export function CollectionDailyReport() {
 
             {settlements.length === 0 ? (
               <div className="p-8 text-center text-sm text-muted-foreground">
-                Belum ada slip setoran kas (settlement) yang diterbitkan pada tanggal {date}.
+                Belum ada slip setoran kas (settlement) yang diterbitkan pada periode {dateRangeLabel}.
               </div>
             ) : (
               <div className="overflow-x-auto">

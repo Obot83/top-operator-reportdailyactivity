@@ -69,6 +69,8 @@ export type CollectionSettlementRecord = {
 
 export type DailyCollectionData = {
   reportDate: string;
+  startDate?: string;
+  endDate?: string;
   latestActivityDate: string;
   summary: {
     totalDebitur: number;
@@ -150,7 +152,9 @@ function getDpdBucket(telat: number): string {
 export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<DailyCollectionData>>> {
   try {
     const { searchParams } = req.nextUrl;
-    let dateStr = searchParams.get('date') ?? '';
+    const startDateParam = searchParams.get('startDate') ?? '';
+    const endDateParam = searchParams.get('endDate') ?? '';
+    const dateParam = searchParams.get('date') ?? '';
     const collectorFilter = searchParams.get('collector') ?? 'all';
     const branchFilter = searchParams.get('branch') ?? 'all';
     const bucketFilter = searchParams.get('bucket') ?? 'all';
@@ -159,38 +163,76 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
     const limit = Math.max(5, parseInt(searchParams.get('limit') ?? '15', 10));
 
+    let startDate = startDateParam || dateParam || '';
+    let endDate = endDateParam || startDateParam || dateParam || '';
+    let latestActivityDate = '2026-10-01';
+    let dateStr = '';
+
     try {
       const db = await getMongoDb();
 
       // If no date provided, find the most recent payment date
-      let latestActivityDate = '2026-10-01';
-      if (!dateStr) {
-        const latestDoc = await db
-          .collection('v_backoffice_kolektor_angsuran_tertagih_list')
-          .find({ tgl_bayar: { $exists: true, $ne: null } }, { projection: { tgl_bayar: 1 } })
-          .sort({ tgl_bayar: -1 })
-          .limit(1)
-          .toArray();
+      const latestDoc = await db
+        .collection('v_backoffice_kolektor_angsuran_tertagih_list')
+        .find({ tgl_bayar: { $exists: true, $ne: null } }, { projection: { tgl_bayar: 1 } })
+        .sort({ tgl_bayar: -1 })
+        .limit(1)
+        .toArray();
 
-        if (latestDoc[0]?.tgl_bayar) {
-          latestActivityDate = String(latestDoc[0].tgl_bayar).slice(0, 10);
-        }
-        dateStr = latestActivityDate;
-      } else {
-        latestActivityDate = dateStr;
+      if (latestDoc[0]?.tgl_bayar) {
+        latestActivityDate = String(latestDoc[0].tgl_bayar).slice(0, 10);
       }
 
-      const dateQuery = {
-        $or: [
-          { tgl_bayar: { $regex: `^${dateStr}` } },
-          {
-            _payment_date: {
-              $gte: new Date(`${dateStr}T00:00:00+07:00`),
-              $lte: new Date(`${dateStr}T23:59:59.999+07:00`),
-            },
-          },
-        ],
-      };
+      if (!startDate && !endDate) {
+        startDate = latestActivityDate;
+        endDate = latestActivityDate;
+      } else {
+        if (!startDate) startDate = endDate;
+        if (!endDate) endDate = startDate;
+      }
+
+      if (startDate > endDate) {
+        const tmp = startDate;
+        startDate = endDate;
+        endDate = tmp;
+      }
+
+      dateStr = startDate === endDate ? startDate : `${startDate} s/d ${endDate}`;
+
+      const dateQuery =
+        startDate === endDate
+          ? {
+              $or: [
+                { tgl_bayar: { $regex: `^${startDate}` } },
+                {
+                  _payment_date: {
+                    $gte: new Date(`${startDate}T00:00:00+07:00`),
+                    $lte: new Date(`${startDate}T23:59:59.999+07:00`),
+                  },
+                },
+              ],
+            }
+          : {
+              $or: [
+                {
+                  tgl_bayar: {
+                    $gte: startDate,
+                    $lte: `${endDate} 23:59:59`,
+                  },
+                },
+                {
+                  _payment_date: {
+                    $gte: new Date(`${startDate}T00:00:00+07:00`),
+                    $lte: new Date(`${endDate}T23:59:59.999+07:00`),
+                  },
+                },
+              ],
+            };
+
+      const settlementDateQuery =
+        startDate === endDate
+          ? { 'header.date': { $regex: `^${startDate}` } }
+          : { 'header.date': { $gte: startDate, $lte: `${endDate} 23:59:59` } };
 
       // Query raw payments, collectors, settlements, due debtors (unpaid penagihan list), and MySQL tasks in parallel
       const [rawPayments, rawCollectors, rawSettlements, rawPenagihan, mysqlTasks] = await Promise.all([
@@ -198,7 +240,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
         db.collection('v_cbx_kolektor').find().toArray(),
         db
           .collection('vs_kolektor_settlement')
-          .find({ 'header.date': { $regex: `^${dateStr}` } })
+          .find(settlementDateQuery)
           .toArray(),
         db.collection('v_kolektor_penagihan_list').find().toArray().catch(() => []),
         prisma.collectionTask
@@ -277,7 +319,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
         });
       }
 
-      // Sertakan juga aktivitas penagihan / kunjungan dari MySQL untuk tanggal dateStr (Gagal Tagih / Janji Bayar)
+      // Sertakan juga aktivitas penagihan / kunjungan dari MySQL untuk periode tanggal (Gagal Tagih / Janji Bayar)
       const seenPaymentContracts = new Set(allPayments.map((p) => p.contract_id));
 
       for (const task of mysqlTasks || []) {
@@ -287,7 +329,8 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
           ? new Date(task.tanggalTagih).toISOString().slice(0, 10)
           : null;
 
-        if (tDate === dateStr && !seenPaymentContracts.has(task.accountNumber)) {
+        const isMatchDate = tDate && tDate >= startDate && tDate <= endDate;
+        if (isMatchDate && !seenPaymentContracts.has(task.accountNumber)) {
           seenPaymentContracts.add(task.accountNumber);
           const loan = task.loanAccount;
           const deb = loan.debitur;
@@ -731,6 +774,8 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
         success: true,
         data: {
           reportDate: dateStr,
+          startDate,
+          endDate,
           latestActivityDate,
           summary: {
             totalDebitur,
@@ -774,6 +819,17 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
       });
     } catch (dbErr) {
       console.warn('[Collection Daily] Live MongoDB query failed, trying Prisma fallback:', dbErr);
+
+      if (!startDate) startDate = '2026-10-01';
+      if (!endDate) endDate = startDate;
+      if (startDate > endDate) {
+        const tmp = startDate;
+        startDate = endDate;
+        endDate = tmp;
+      }
+      if (!dateStr) {
+        dateStr = startDate === endDate ? startDate : `${startDate} s/d ${endDate}`;
+      }
 
       // Fallback to Prisma if MySQL has collection tasks
       const tasks = await prisma.collectionTask.findMany({
@@ -837,7 +893,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
             : task.tanggalTagih
             ? new Date(task.tanggalTagih).toISOString().slice(0, 10)
             : null;
-          return !tDate || tDate === dateStr;
+          return !tDate || (tDate >= startDate && tDate <= endDate);
         })
         .map((task) => {
           const loan = task.loanAccount;
@@ -902,7 +958,9 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
         success: true,
         data: {
           reportDate: dateStr,
-          latestActivityDate: dateStr,
+          startDate,
+          endDate,
+          latestActivityDate: startDate,
           summary: {
             totalDebitur: filteredFallbackPayments.length,
             totalRealisasi: filteredFallbackPayments.reduce((acc, p) => acc + p.nominal_dibayar, 0),
