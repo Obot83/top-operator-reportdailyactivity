@@ -29,7 +29,44 @@ import type {
   DailyCollectionData,
   CollectionPaymentRecord,
   CollectionDueDebtorRecord,
+  PaymentStatusType,
 } from '@/app/api/reports/collection/daily/route';
+
+export function normalizeStatusBayar(
+  status: string | undefined | null,
+  nominalDibayar = 0,
+  totalTagihan = 0
+): PaymentStatusType {
+  if (!status) {
+    if (nominalDibayar >= totalTagihan && nominalDibayar > 0) return 'Bayar Penuh';
+    if (nominalDibayar > 0) return 'Bayar Parcial';
+    return 'Gagal Tagih';
+  }
+  const s = status.toUpperCase().trim();
+  if (s === 'BAYAR PENUH' || s === 'SUDAH_BAYAR' || s === 'LUNAS') {
+    if (totalTagihan > 0 && nominalDibayar > 0 && nominalDibayar < totalTagihan) {
+      return 'Bayar Parcial';
+    }
+    return 'Bayar Penuh';
+  }
+  if (s === 'BAYAR PARCIAL' || s === 'BAYAR PARSIAL' || s === 'PARTIAL' || s === 'PARSIAL' || s === 'SEBAGIAN') {
+    return 'Bayar Parcial';
+  }
+  if (
+    s === 'GAGAL TAGIH' ||
+    s === 'TIDAK_BISA_BAYAR' ||
+    s === 'SUDAH_DIKUNJUNGI' ||
+    s === 'GAGAL' ||
+    s === 'REFUSED' ||
+    s === 'VACANT'
+  ) {
+    return 'Gagal Tagih';
+  }
+  if (s === 'JANJI BAYAR' || s === 'JANJI_BAYAR' || s === 'PTP') {
+    return 'Janji Bayar';
+  }
+  return 'Bayar Penuh';
+}
 
 const DPD_BUCKETS = [
   'Lancar (0)',
@@ -60,16 +97,18 @@ export function CollectionDailyReport() {
   const [activeTab, setActiveTab] = useState<'feed' | 'due' | 'collectors' | 'settlement' | 'analytics'>('feed');
   const [dueStatusFilter, setDueStatusFilter] = useState<'all' | 'Belum Tagih' | 'Gagal Tagih' | 'Janji Bayar'>('all');
   const [dueSearchQuery, setDueSearchQuery] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | PaymentStatusType>('all');
 
   // Query daily collection data
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ['collection-daily', date, selectedCollector, selectedBranch, selectedBucket, searchQuery, page, limit],
+    queryKey: ['collection-daily', date, selectedCollector, selectedBranch, selectedBucket, paymentStatusFilter, searchQuery, page, limit],
     queryFn: async (): Promise<DailyCollectionData> => {
       const params = new URLSearchParams({
         date,
         collector: selectedCollector,
         branch: selectedBranch,
         bucket: selectedBucket,
+        status: paymentStatusFilter,
         q: searchQuery,
         page: String(page),
         limit: String(limit),
@@ -90,6 +129,14 @@ export function CollectionDailyReport() {
   const branches = data?.branches ?? [];
   const pagination = data?.pagination;
 
+  const filteredPayments = payments.filter((p) => {
+    if (paymentStatusFilter !== 'all') {
+      const norm = normalizeStatusBayar(p.statusBayar, p.nominal_dibayar, p.total_tagihan);
+      if (norm !== paymentStatusFilter) return false;
+    }
+    return true;
+  });
+
   const filteredDueDebtors = dueDebtors.filter((d) => {
     if (selectedCollector !== 'all' && d.collector_id !== selectedCollector && d.collector_name !== selectedCollector) return false;
     if (selectedBranch !== 'all' && d.branch_name !== selectedBranch && d.branch_id !== selectedBranch) return false;
@@ -108,6 +155,7 @@ export function CollectionDailyReport() {
     setSelectedBranch('all');
     setSelectedBucket('all');
     setSearchQuery('');
+    setPaymentStatusFilter('all');
     setDueStatusFilter('all');
     setDueSearchQuery('');
     setPage(1);
@@ -191,7 +239,7 @@ export function CollectionDailyReport() {
       `"${p.bucket}"`,
       p.total_tagihan,
       p.nominal_dibayar,
-      p.statusBayar,
+      `"${normalizeStatusBayar(p.statusBayar, p.nominal_dibayar, p.total_tagihan)}"`,
     ]);
     const csvContent = '\uFEFF' + [header.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -363,7 +411,7 @@ export function CollectionDailyReport() {
           </div>
         </div>
 
-        {(selectedCollector !== 'all' || selectedBranch !== 'all' || selectedBucket !== 'all' || searchQuery) && (
+        {(selectedCollector !== 'all' || selectedBranch !== 'all' || selectedBucket !== 'all' || searchQuery || paymentStatusFilter !== 'all') && (
           <div className="flex items-center justify-between border-t border-border/60 pt-2 text-xs text-muted-foreground">
             <span>Filter aktif diterapkan</span>
             <button
@@ -499,9 +547,6 @@ export function CollectionDailyReport() {
         >
           <AlertTriangle className="h-4 w-4 text-amber-500" />
           Daftar Debitur Jatuh Tempo ({dueDebtors.length})
-          <span className="rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.2 text-[10px] font-bold">
-            Belum Bayar
-          </span>
         </button>
 
         <button
@@ -587,112 +632,193 @@ export function CollectionDailyReport() {
       {/* ── Tab 1: Log Pembayaran & Kunjungan ───────────────── */}
       {!isLoading && !error && payments.length > 0 && activeTab === 'feed' && (
         <section className="space-y-4">
-          <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-muted/50 border-b border-border/80 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <tr>
-                    <th className="px-3.5 py-3 whitespace-nowrap">No. Kontrak</th>
-                    <th className="px-3.5 py-3 whitespace-nowrap">Debitur / No. HP</th>
-                    <th className="px-3.5 py-3 min-w-[220px]">Lokasi Rumah (GPS)</th>
-                    <th className="px-3.5 py-3 whitespace-nowrap">Kolektor</th>
-                    <th className="px-3.5 py-3 whitespace-nowrap">Cabang</th>
-                    <th className="px-3.5 py-3 text-center whitespace-nowrap">Tenor</th>
-                    <th className="px-3.5 py-3 text-center whitespace-nowrap">DPD</th>
-                    <th className="px-3.5 py-3 text-right whitespace-nowrap">Total Tagihan</th>
-                    <th className="px-3.5 py-3 text-right whitespace-nowrap">Realisasi (Bayar)</th>
-                    <th className="px-3.5 py-3 text-center whitespace-nowrap">Waktu Bayar</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {payments.map((p) => (
-                    <tr key={p.id} className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
-                      <td className="px-3.5 py-3 font-mono font-medium text-xs">
-                        <Link
-                          href={`/dashboard/debitur/${encodeURIComponent(p.contract_id)}`}
-                          className="text-primary hover:underline font-semibold flex items-center gap-1 group"
-                          title="Buka Debitur Card Controller"
-                        >
-                          <span>{p.contract_id}</span>
-                          <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100 transition-opacity" />
-                        </Link>
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <p className="font-semibold text-foreground text-xs">{p.debitur}</p>
-                        <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{p.no_hp}</p>
-                      </td>
-                      <td className="px-3.5 py-3 max-w-[260px]">
-                        <div className="flex flex-col gap-1">
-                          {p.alamat_rumah ? (
-                            <p className="text-[11px] text-foreground line-clamp-2 leading-tight" title={p.alamat_rumah}>
-                              {p.alamat_rumah}
-                            </p>
-                          ) : (
-                            <span className="text-[11px] text-muted-foreground italic">Alamat belum terdaftar</span>
-                          )}
-
-                          {p.latitude != null && p.longitude != null ? (
-                            <a
-                              href={p.maps_url ?? `https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 rounded px-1.5 py-0.5 w-fit transition-colors group"
-                              title="Buka titik koordinat GPS di Google Maps"
-                            >
-                              <MapPin className="h-3 w-3 text-emerald-600 flex-shrink-0" />
-                              <span className="truncate">{p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}</span>
-                              <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100 flex-shrink-0" />
-                            </a>
-                          ) : p.alamat_rumah ? (
-                            <a
-                              href={p.maps_url ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.alamat_rumah)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted border border-border rounded px-1.5 py-0.5 w-fit transition-colors group"
-                              title="Cari alamat di Google Maps"
-                            >
-                              <Navigation className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                              <span>Cari di Peta</span>
-                              <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100 flex-shrink-0" />
-                            </a>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-3.5 py-3">
-                        <span className="font-medium text-foreground">{p.collector_name}</span>
-                      </td>
-                      <td className="px-3.5 py-3 text-xs text-muted-foreground">
-                        {p.branch_name}
-                      </td>
-                      <td className="px-3.5 py-3 text-center">
-                        <span className="inline-flex items-center justify-center font-mono font-semibold px-2 py-0.5 rounded bg-muted/60 text-foreground text-[11px]">
-                          {p.step_tenor}
-                        </span>
-                      </td>
-                      <td className="px-3.5 py-3 text-center">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getBadgeVariant(
-                            p.bucket
-                          )}`}
-                        >
-                          {p.telat} hari
-                        </span>
-                        <span className="block text-[10px] text-muted-foreground mt-0.5">{p.bucket}</span>
-                      </td>
-                      <td className="px-3.5 py-3 text-right font-mono text-xs text-muted-foreground">
-                        {formatRupiah(p.total_tagihan)}
-                      </td>
-                      <td className="px-3.5 py-3 text-right font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
-                        {formatRupiah(p.nominal_dibayar)}
-                      </td>
-                      <td className="px-3.5 py-3 text-center text-[11px] text-muted-foreground font-mono whitespace-nowrap">
-                        {p.tgl_bayar}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Quick Filter Bar for Status Bayar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/20 p-3 rounded-xl border border-border">
+            {/* Status Bayar Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-semibold text-muted-foreground mr-1">Status Bayar:</span>
+              {(['all', 'Bayar Penuh', 'Bayar Parcial', 'Gagal Tagih', 'Janji Bayar'] as const).map((st) => {
+                const count =
+                  st === 'all'
+                    ? payments.length
+                    : payments.filter((p) => normalizeStatusBayar(p.statusBayar, p.nominal_dibayar, p.total_tagihan) === st).length;
+                const isActive = paymentStatusFilter === st;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => {
+                      setPaymentStatusFilter(st);
+                      setPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors border ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                        : 'bg-card text-muted-foreground hover:bg-muted border-border'
+                    }`}
+                  >
+                    {st === 'all' ? 'Semua' : st} ({count})
+                  </button>
+                );
+              })}
             </div>
+          </div>
+
+          {filteredPayments.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
+              <p className="font-semibold text-sm">Tidak ada transaksi yang cocok dengan status bayar "{paymentStatusFilter}"</p>
+              <p className="text-xs text-muted-foreground">Silakan sesuaikan filter status bayar di atas.</p>
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/50 border-b border-border/80 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <tr>
+                      <th className="px-3.5 py-3 whitespace-nowrap">No. Kontrak</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Debitur / No. HP</th>
+                      <th className="px-3.5 py-3 min-w-[220px]">Lokasi Rumah (GPS)</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Kolektor</th>
+                      <th className="px-3.5 py-3 whitespace-nowrap">Cabang</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Tenor</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">DPD</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Total Tagihan</th>
+                      <th className="px-3.5 py-3 text-right whitespace-nowrap">Realisasi (Bayar)</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Status Bayar</th>
+                      <th className="px-3.5 py-3 text-center whitespace-nowrap">Waktu Bayar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {filteredPayments.map((p) => (
+                      <tr key={p.id} className="even:bg-muted/[0.12] hover:bg-muted/30 transition-colors">
+                        <td className="px-3.5 py-3 font-mono font-medium text-xs">
+                          <Link
+                            href={`/dashboard/debitur/${encodeURIComponent(p.contract_id)}`}
+                            className="text-primary hover:underline font-semibold flex items-center gap-1 group"
+                            title="Buka Debitur Card Controller"
+                          >
+                            <span>{p.contract_id}</span>
+                            <ExternalLink className="h-3 w-3 opacity-60 group-hover:opacity-100 transition-opacity" />
+                          </Link>
+                        </td>
+                        <td className="px-3.5 py-3">
+                          <p className="font-semibold text-foreground text-xs">{p.debitur}</p>
+                          <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{p.no_hp}</p>
+                        </td>
+                        <td className="px-3.5 py-3 max-w-[260px]">
+                          <div className="flex flex-col gap-1">
+                            {p.alamat_rumah ? (
+                              <p className="text-[11px] text-foreground line-clamp-2 leading-tight" title={p.alamat_rumah}>
+                                {p.alamat_rumah}
+                              </p>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground italic">Alamat belum terdaftar</span>
+                            )}
+
+                            {p.latitude != null && p.longitude != null ? (
+                              <a
+                                href={p.maps_url ?? `https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 rounded px-1.5 py-0.5 w-fit transition-colors group"
+                                title="Buka titik koordinat GPS di Google Maps"
+                              >
+                                <MapPin className="h-3 w-3 text-emerald-600 flex-shrink-0" />
+                                <span className="truncate">{p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}</span>
+                                <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100 flex-shrink-0" />
+                              </a>
+                            ) : p.alamat_rumah ? (
+                              <a
+                                href={p.maps_url ?? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.alamat_rumah)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground bg-muted/60 hover:bg-muted border border-border rounded px-1.5 py-0.5 w-fit transition-colors group"
+                                title="Cari alamat di Google Maps"
+                              >
+                                <Navigation className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                <span>Cari di Peta</span>
+                                <ExternalLink className="h-2.5 w-2.5 opacity-60 group-hover:opacity-100 flex-shrink-0" />
+                              </a>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-3.5 py-3">
+                          <span className="font-medium text-foreground">{p.collector_name}</span>
+                        </td>
+                        <td className="px-3.5 py-3 text-xs text-muted-foreground">
+                          {p.branch_name}
+                        </td>
+                        <td className="px-3.5 py-3 text-center">
+                          <span className="inline-flex items-center justify-center font-mono font-semibold px-2 py-0.5 rounded bg-muted/60 text-foreground text-[11px]">
+                            {p.step_tenor}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-3 text-center">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getBadgeVariant(
+                              p.bucket
+                            )}`}
+                          >
+                            {p.telat} hari
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground mt-0.5">{p.bucket}</span>
+                        </td>
+                        <td className="px-3.5 py-3 text-right font-mono text-xs text-muted-foreground">
+                          {formatRupiah(p.total_tagihan)}
+                        </td>
+                        <td className="px-3.5 py-3 text-right font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400">
+                          {formatRupiah(p.nominal_dibayar)}
+                        </td>
+                        <td className="px-3.5 py-3 text-center whitespace-nowrap">
+                          {(() => {
+                            const st = normalizeStatusBayar(p.statusBayar, p.nominal_dibayar, p.total_tagihan);
+                            if (st === 'Bayar Penuh') {
+                              return (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Bayar Penuh
+                                </span>
+                              );
+                            }
+                            if (st === 'Bayar Parcial') {
+                              return (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-teal-500/30 bg-teal-500/10 px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-400">
+                                  <CreditCard className="h-3 w-3" />
+                                  Bayar Parcial
+                                </span>
+                              );
+                            }
+                            if (st === 'Gagal Tagih') {
+                              return (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:text-rose-400">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Gagal Tagih
+                                </span>
+                              );
+                            }
+                            if (st === 'Janji Bayar') {
+                              return (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400">
+                                  <Clock className="h-3 w-3" />
+                                  Janji Bayar
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                                {st}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-3.5 py-3 text-center text-[11px] text-muted-foreground font-mono whitespace-nowrap">
+                          {p.tgl_bayar}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
             {/* Pagination Controls */}
             {pagination && pagination.totalPages > 1 && (
@@ -741,6 +867,7 @@ export function CollectionDailyReport() {
               </div>
             )}
           </div>
+        )}
         </section>
       )}
 

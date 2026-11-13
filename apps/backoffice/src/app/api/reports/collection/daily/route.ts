@@ -3,6 +3,10 @@ import { getMongoDb } from '@/lib/mongodb';
 import { prisma } from '@/lib/prisma';
 import type { ApiResponse } from '@/shared/types';
 
+export const dynamic = 'force-dynamic';
+
+export type PaymentStatusType = 'Bayar Penuh' | 'Bayar Parcial' | 'Gagal Tagih' | 'Janji Bayar';
+
 export type CollectionPaymentRecord = {
   id: string;
   contract_id: string;
@@ -21,7 +25,7 @@ export type CollectionPaymentRecord = {
   step_tenor: string;
   tenor: number;
   bucket: string;
-  statusBayar: 'SUDAH_BAYAR' | 'PARTIAL' | 'JANJI_BAYAR';
+  statusBayar: PaymentStatusType | string;
   // GPS & Lokasi Rumah Debitur
   latitude?: number | null;
   longitude?: number | null;
@@ -150,6 +154,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
     const collectorFilter = searchParams.get('collector') ?? 'all';
     const branchFilter = searchParams.get('branch') ?? 'all';
     const bucketFilter = searchParams.get('bucket') ?? 'all';
+    const statusFilter = searchParams.get('status') ?? 'all';
     const q = (searchParams.get('q') ?? '').toLowerCase().trim();
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
     const limit = Math.max(5, parseInt(searchParams.get('limit') ?? '15', 10));
@@ -238,9 +243,16 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
         const telat = Number(p.telat) || 0;
         const bucket = getDpdBucket(telat);
 
-        let statusBayar: 'SUDAH_BAYAR' | 'PARTIAL' | 'JANJI_BAYAR' = 'SUDAH_BAYAR';
-        if (nominalDibayar < totalTagihan && nominalDibayar > 0) {
-          statusBayar = 'PARTIAL';
+        let statusBayar: PaymentStatusType = 'Bayar Penuh';
+        const notesLower = String(p.notes || '').toLowerCase();
+        if (notesLower.includes('janji') || notesLower.includes('ptp')) {
+          statusBayar = 'Janji Bayar';
+        } else if (nominalDibayar === 0) {
+          statusBayar = 'Gagal Tagih';
+        } else if (nominalDibayar < totalTagihan) {
+          statusBayar = 'Bayar Parcial';
+        } else {
+          statusBayar = 'Bayar Penuh';
         }
 
         allPayments.push({
@@ -265,13 +277,79 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
         });
       }
 
+      // Sertakan juga aktivitas penagihan / kunjungan dari MySQL untuk tanggal dateStr (Gagal Tagih / Janji Bayar)
+      const seenPaymentContracts = new Set(allPayments.map((p) => p.contract_id));
+
+      for (const task of mysqlTasks || []) {
+        const tDate = task.tanggalKunjungan
+          ? new Date(task.tanggalKunjungan).toISOString().slice(0, 10)
+          : task.tanggalTagih
+          ? new Date(task.tanggalTagih).toISOString().slice(0, 10)
+          : null;
+
+        if (tDate === dateStr && !seenPaymentContracts.has(task.accountNumber)) {
+          seenPaymentContracts.add(task.accountNumber);
+          const loan = task.loanAccount;
+          const deb = loan.debitur;
+          const total = Number(task.tagihanPokok) + Number(task.tagihanBunga) + Number(task.tagihanDenda);
+          const dibayar = Number(task.terealisasiPokok) + Number(task.terealisasiBunga) + Number(task.terealisasiDenda);
+
+          let statusBayar: PaymentStatusType = 'Gagal Tagih';
+          if (dibayar >= total && dibayar > 0) {
+            statusBayar = 'Bayar Penuh';
+          } else if (dibayar > 0 && dibayar < total) {
+            statusBayar = 'Bayar Parcial';
+          } else if (
+            task.statusBayar === 'JANJI_BAYAR' ||
+            loan.ptpTrackings?.some((ptp: any) => ptp.status === 'PENDING')
+          ) {
+            statusBayar = 'Janji Bayar';
+          } else {
+            statusBayar = 'Gagal Tagih';
+          }
+
+          const branchName = 'Cabang Utama';
+          branchesSet.add(branchName);
+
+          allPayments.push({
+            id: `task-${task.id}`,
+            contract_id: task.accountNumber,
+            debitur: deb.name,
+            no_hp: deb.phone || '-',
+            collector_id: task.officerId,
+            collector_name: task.officer.name,
+            branch_id: task.loanAccount.branchId,
+            branch_name: branchName,
+            tgl_bayar: task.tanggalKunjungan
+              ? new Date(task.tanggalKunjungan).toISOString().slice(0, 16).replace('T', ' ')
+              : `${dateStr} 09:00`,
+            _payment_date: task.tanggalKunjungan ? new Date(task.tanggalKunjungan).toISOString() : undefined,
+            telat: loan.dpd,
+            nominal_dibayar: dibayar,
+            total_tagihan: total,
+            step_tenor: `1/${loan.tenorMinggu}`,
+            tenor: loan.tenorMinggu,
+            bucket: getDpdBucket(loan.dpd),
+            statusBayar,
+            alamat_rumah: deb.domisiliAddress,
+            latitude: deb.defaultLatitude,
+            longitude: deb.defaultLongitude,
+            maps_url:
+              deb.defaultLatitude != null && deb.defaultLongitude != null
+                ? `https://www.google.com/maps?q=${deb.defaultLatitude},${deb.defaultLongitude}`
+                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deb.domisiliAddress)}`,
+          });
+        }
+      }
+
       // Filter payments based on user inputs
       const filteredPayments = allPayments.filter((p) => {
         if (collectorFilter !== 'all' && p.collector_id !== collectorFilter) return false;
         if (branchFilter !== 'all' && p.branch_name !== branchFilter) return false;
         if (bucketFilter !== 'all' && p.bucket !== bucketFilter) return false;
+        if (statusFilter !== 'all' && p.statusBayar !== statusFilter) return false;
         if (q) {
-          const haystack = `${p.contract_id} ${p.debitur} ${p.no_hp} ${p.collector_name} ${p.branch_name} ${p.bucket}`.toLowerCase();
+          const haystack = `${p.contract_id} ${p.debitur} ${p.no_hp} ${p.collector_name} ${p.branch_name} ${p.bucket} ${p.statusBayar}`.toLowerCase();
           if (!haystack.includes(q)) return false;
         }
         return true;
@@ -640,7 +718,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
           totalTagihan: p.total_tagihan,
           nominalDibayar: p.nominal_dibayar,
           statusBayar: p.statusBayar,
-          statusBayarLabel: p.statusBayar === 'SUDAH_BAYAR' ? 'Sudah Bayar' : 'Bayar Sebagian',
+          statusBayarLabel: String(p.statusBayar),
           tglBayar: p.tgl_bayar,
           stepTenor: p.step_tenor,
           branchName: p.branch_name,
@@ -752,16 +830,84 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
       const dueGagalTagih = fallbackDueDebtors.filter((d) => d.status === 'Gagal Tagih').length;
       const dueJanjiBayar = fallbackDueDebtors.filter((d) => d.status === 'Janji Bayar').length;
 
+      const fallbackPayments: CollectionPaymentRecord[] = tasks
+        .filter((task) => {
+          const tDate = task.tanggalKunjungan
+            ? new Date(task.tanggalKunjungan).toISOString().slice(0, 10)
+            : task.tanggalTagih
+            ? new Date(task.tanggalTagih).toISOString().slice(0, 10)
+            : null;
+          return !tDate || tDate === dateStr;
+        })
+        .map((task) => {
+          const loan = task.loanAccount;
+          const deb = loan.debitur;
+          const total = Number(task.tagihanPokok) + Number(task.tagihanBunga) + Number(task.tagihanDenda);
+          const dibayar = Number(task.terealisasiPokok) + Number(task.terealisasiBunga) + Number(task.terealisasiDenda);
+
+          let statusBayar: PaymentStatusType = 'Gagal Tagih';
+          if (dibayar >= total && dibayar > 0) {
+            statusBayar = 'Bayar Penuh';
+          } else if (dibayar > 0 && dibayar < total) {
+            statusBayar = 'Bayar Parcial';
+          } else if (task.statusBayar === 'JANJI_BAYAR' || loan.ptpTrackings?.some((ptp: any) => ptp.status === 'PENDING')) {
+            statusBayar = 'Janji Bayar';
+          } else {
+            statusBayar = 'Gagal Tagih';
+          }
+
+          return {
+            id: `task-${task.id}`,
+            contract_id: task.accountNumber,
+            debitur: deb.name,
+            no_hp: deb.phone || '-',
+            collector_id: task.officerId,
+            collector_name: task.officer.name,
+            branch_id: task.loanAccount.branchId,
+            branch_name: 'Cabang Utama',
+            tgl_bayar: task.tanggalKunjungan
+              ? new Date(task.tanggalKunjungan).toISOString().slice(0, 16).replace('T', ' ')
+              : `${dateStr} 09:00`,
+            _payment_date: task.tanggalKunjungan ? new Date(task.tanggalKunjungan).toISOString() : undefined,
+            telat: loan.dpd,
+            nominal_dibayar: dibayar,
+            total_tagihan: total,
+            step_tenor: `1/${loan.tenorMinggu}`,
+            tenor: loan.tenorMinggu,
+            bucket: getDpdBucket(loan.dpd),
+            statusBayar,
+            alamat_rumah: deb.domisiliAddress,
+            latitude: deb.defaultLatitude,
+            longitude: deb.defaultLongitude,
+            maps_url:
+              deb.defaultLatitude != null && deb.defaultLongitude != null
+                ? `https://www.google.com/maps?q=${deb.defaultLatitude},${deb.defaultLongitude}`
+                : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deb.domisiliAddress)}`,
+          };
+        });
+
+      const filteredFallbackPayments = fallbackPayments.filter((p) => {
+        if (collectorFilter !== 'all' && p.collector_id !== collectorFilter) return false;
+        if (branchFilter !== 'all' && p.branch_name !== branchFilter) return false;
+        if (bucketFilter !== 'all' && p.bucket !== bucketFilter) return false;
+        if (statusFilter !== 'all' && p.statusBayar !== statusFilter) return false;
+        if (q) {
+          const haystack = `${p.contract_id} ${p.debitur} ${p.no_hp} ${p.collector_name} ${p.branch_name} ${p.bucket} ${p.statusBayar}`.toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      });
+
       return NextResponse.json({
         success: true,
         data: {
           reportDate: dateStr,
           latestActivityDate: dateStr,
           summary: {
-            totalDebitur: tasks.length,
-            totalRealisasi: 0,
-            totalTagihan: 0,
-            avgDpd: 0,
+            totalDebitur: filteredFallbackPayments.length,
+            totalRealisasi: filteredFallbackPayments.reduce((acc, p) => acc + p.nominal_dibayar, 0),
+            totalTagihan: filteredFallbackPayments.reduce((acc, p) => acc + p.total_tagihan, 0),
+            avgDpd: filteredFallbackPayments.length > 0 ? Math.round(filteredFallbackPayments.reduce((acc, p) => acc + p.telat, 0) / filteredFallbackPayments.length) : 0,
             activeCollectors: 0,
             totalSettlementCash: 0,
             totalSettlementTf: 0,
@@ -775,7 +921,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<ApiResponse<Da
             dueGagalTagih,
             dueJanjiBayar,
           },
-          payments: [],
+          payments: filteredFallbackPayments,
           dueDebtors: fallbackDueDebtors,
           settlements: [],
           collectors: [],
