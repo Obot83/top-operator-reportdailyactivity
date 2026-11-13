@@ -196,8 +196,35 @@ export interface DebtorCreditCapacity {
     approverUsername?: string;
     tanggalProses?: string;
   };
+  pencairan?: {
+    status?: string;
+    plafon?: number;
+    tenor?: number;
+    tanggalCair?: string;
+    officerName?: string;
+    officerUsername?: string;
+    keterangan?: string;
+  };
+  processSteps?: LoanProcessStep[];
   angsuranEstimasi?: number;
   saldoTitipan?: number;
+}
+
+export interface LoanProcessStep {
+  stepNumber: number;
+  stepName: string;
+  stepKey: 'INPUT_LEADS' | 'CEK_SLIK' | 'SURVEI_LAPANGAN' | 'REKOMENDASI_CA' | 'REVIEW_KOMITE' | 'PENCAIRAN';
+  tanggal?: string;
+  officerName: string;
+  officerRole?: string;
+  officerUsername?: string;
+  plafon?: number;
+  tenor?: number;
+  tenorType?: string;
+  nominalText?: string;
+  status: string;
+  keterangan?: string;
+  badgeVariant?: 'default' | 'success' | 'warning' | 'info' | 'secondary';
 }
 
 export interface DebtorDocumentItem {

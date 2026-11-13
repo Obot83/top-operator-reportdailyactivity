@@ -49,8 +49,9 @@ import type {
   DebtorJobCapacity,
   DebtorOtherContractItem,
   DebtorCreditCapacity,
+  LoanProcessStep,
 } from '@/shared/types';
-import { formatRupiah, formatDate, getDpdBadgeVariant, getKolektibilitasLabel } from '@/lib/formatters';
+import { formatRupiah, formatDate, formatDateTime, getDpdBadgeVariant, getKolektibilitasLabel } from '@/lib/formatters';
 import { VisitTimelineItem } from '@/components/debitur/VisitTimelineItem';
 import { PTPTable } from '@/components/debitur/PTPTable';
 import { CollateralGallery } from '@/components/debitur/CollateralGallery';
@@ -1245,9 +1246,17 @@ export default function DebiturControllerPage() {
 
 // ─── Sub-components ────────────────────────────────────
 
+function getStepStatusBadgeVariant(status: string): 'default' | 'secondary' | 'outline' | 'destructive' {
+  const s = (status || '').toUpperCase();
+  if (s.includes('REJECT') || s.includes('TOLAK') || s.includes('FAILED')) return 'destructive';
+  if (s.includes('APPROVE') || s.includes('SETUJU') || s.includes('CAIR') || s.includes('PASSED') || s.includes('SELESAI')) return 'default';
+  if (s.includes('REKOMENDASI')) return 'secondary';
+  return 'outline';
+}
+
 /**
- * Komponen reusable untuk analisis kapasitas kredit & rekomendasi komite
- * Digunakan di dropdown row maupun di modal dialog tab Daftar Kontrak
+ * Komponen reusable untuk analisis kapasitas kredit & alur proses pengajuan sistem
+ * Digunakan di dropdown row maupun di modal dialog tab Daftar Kontrak (Format Tabel)
  */
 function ContractAnalysisDetail({
   contract,
@@ -1272,6 +1281,122 @@ function ContractAnalysisDetail({
     contract.plafon > 15000000;
 
   const tenorUnit = isCertificateProduct ? 'Bulan' : 'Minggu';
+
+  // Susun alur step pengajuan sistem (Input Leads s/d Pencairan)
+  const steps: LoanProcessStep[] =
+    creditCapacity?.processSteps && creditCapacity.processSteps.length > 0
+      ? creditCapacity.processSteps
+      : [
+          {
+            stepNumber: 1,
+            stepName: 'Input Data Leads (AO)',
+            stepKey: 'INPUT_LEADS',
+            tanggal: creditCapacity?.tanggalPengajuan,
+            officerName: creditCapacity?.aoName || 'Petugas AO Lapangan',
+            officerRole: 'Account Officer (Sales)',
+            officerUsername: creditCapacity?.aoUsername,
+            plafon: plafonPengajuan,
+            tenor,
+            tenorType: isCertificateProduct ? 'BULAN' : 'MINGGU',
+            nominalText: `${formatRupiah(plafonPengajuan)} (${tenor} ${tenorUnit})`,
+            status: 'Disubmit (Selesai Mandatory)',
+            keterangan: creditCapacity?.loanPurpose || 'Input data pemohon dan pengajuan fasilitas pembiayaan.',
+          },
+          {
+            stepNumber: 2,
+            stepName: 'Pengecekan SLIK & CBI Gateway',
+            stepKey: 'CEK_SLIK',
+            tanggal: creditCapacity?.slikChecking?.tanggalPengecekan,
+            officerName: creditCapacity?.slikChecking?.officerName || creditCapacity?.aoName || 'Petugas Cek SLIK',
+            officerRole: 'Petugas Cek SLIK & CBI',
+            officerUsername: creditCapacity?.slikChecking?.officerUsername,
+            nominalText: creditCapacity?.slikChecking?.cbiScore
+              ? `Score CBI: ${creditCapacity.slikChecking.cbiScore}`
+              : 'Lolos CBI (Grade A)',
+            status: creditCapacity?.slikChecking?.status || 'Approve',
+            keterangan:
+              creditCapacity?.slikChecking?.keterangan ||
+              'Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas.',
+          },
+          {
+            stepNumber: 3,
+            stepName: 'Survei Lapangan (Surveyor)',
+            stepKey: 'SURVEI_LAPANGAN',
+            tanggal: creditCapacity?.surveyorRecommendation?.tanggalSurvey,
+            officerName: creditCapacity?.surveyorRecommendation?.officerName || 'Surveyor Lapangan',
+            officerRole: 'Surveyor Cabang',
+            officerUsername: creditCapacity?.surveyorRecommendation?.officerUsername,
+            plafon: creditCapacity?.surveyorRecommendation?.plafon || plafonRealisasi,
+            tenor: creditCapacity?.surveyorRecommendation?.tenor || tenor,
+            tenorType: isCertificateProduct ? 'BULAN' : 'MINGGU',
+            nominalText: `${formatRupiah(creditCapacity?.surveyorRecommendation?.plafon || plafonRealisasi)} (${
+              creditCapacity?.surveyorRecommendation?.tenor || tenor
+            } ${tenorUnit})`,
+            status: creditCapacity?.surveyorRecommendation?.status || 'Rekomendasi Survei',
+            keterangan:
+              creditCapacity?.surveyorRecommendation?.keterangan ||
+              'Usaha aktif berjalan lancar dan memenuhi kriteria kelayakan pembiayaan.',
+          },
+          {
+            stepNumber: 4,
+            stepName: 'Rekomendasi Credit Analyst (CA)',
+            stepKey: 'REKOMENDASI_CA',
+            tanggal: creditCapacity?.analystRecommendation?.tanggalProses,
+            officerName: creditCapacity?.analystRecommendation?.analystName || 'Credit Analyst Memorandum',
+            officerRole: 'Credit Analyst (Kaops)',
+            officerUsername: creditCapacity?.analystRecommendation?.analystUsername,
+            plafon: creditCapacity?.analystRecommendation?.plafon || plafonRealisasi,
+            tenor: creditCapacity?.analystRecommendation?.tenor || tenor,
+            tenorType: isCertificateProduct ? 'BULAN' : 'MINGGU',
+            nominalText: `${formatRupiah(creditCapacity?.analystRecommendation?.plafon || plafonRealisasi)} (${
+              creditCapacity?.analystRecommendation?.tenor || tenor
+            } ${tenorUnit})`,
+            status: creditCapacity?.analystRecommendation?.status || 'Rekomendasi Analis',
+            keterangan:
+              creditCapacity?.analystRecommendation?.keterangan ||
+              'Kapasitas bayar (DSR) sehat dan kemampuan angsuran memadai untuk direalisasikan.',
+          },
+          {
+            stepNumber: 5,
+            stepName: 'Review & Persetujuan Komite Kredit',
+            stepKey: 'REVIEW_KOMITE',
+            tanggal: creditCapacity?.komiteRecommendation?.tanggalProses,
+            officerName: creditCapacity?.komiteRecommendation?.approverName || 'Petugas Approval Memorandum / KC',
+            officerRole: 'Ketua Komite (Kepala Cabang)',
+            officerUsername: creditCapacity?.komiteRecommendation?.approverUsername,
+            plafon: creditCapacity?.komiteRecommendation?.plafon || plafonRealisasi,
+            tenor: creditCapacity?.komiteRecommendation?.tenor || tenor,
+            tenorType: isCertificateProduct ? 'BULAN' : 'MINGGU',
+            nominalText: `${formatRupiah(creditCapacity?.komiteRecommendation?.plafon || plafonRealisasi)} (${
+              creditCapacity?.komiteRecommendation?.tenor || tenor
+            } ${tenorUnit})`,
+            status: creditCapacity?.komiteRecommendation?.status || 'Disetujui Komite (Approved)',
+            keterangan:
+              creditCapacity?.komiteRecommendation?.keterangan ||
+              'Persetujuan komite kredit sesuai memorandum analisis, hasil survei, dan verifikasi dokumen pemohon.',
+          },
+          {
+            stepNumber: 6,
+            stepName: 'Pencairan & Realisasi (Booking)',
+            stepKey: 'PENCAIRAN',
+            tanggal:
+              creditCapacity?.pencairan?.tanggalCair ||
+              (contract.contractDate ? new Date(contract.contractDate).toISOString() : undefined),
+            officerName: creditCapacity?.pencairan?.officerName || 'Admin Pembiayaan (Kodein)',
+            officerRole: 'Admin Booking & Realisasi',
+            officerUsername: creditCapacity?.pencairan?.officerUsername,
+            plafon: creditCapacity?.pencairan?.plafon || plafonRealisasi,
+            tenor: creditCapacity?.pencairan?.tenor || tenor,
+            tenorType: isCertificateProduct ? 'BULAN' : 'MINGGU',
+            nominalText: `${formatRupiah(creditCapacity?.pencairan?.plafon || plafonRealisasi)} (${
+              creditCapacity?.pencairan?.tenor || tenor
+            } ${tenorUnit})`,
+            status: creditCapacity?.pencairan?.status || 'Selesai Pencairan (Cair)',
+            keterangan:
+              creditCapacity?.pencairan?.keterangan ||
+              'Fasilitas pembiayaan telah ditandatangani akad dan dana pokok berhasil dicairkan ke rekening pemohon.',
+          },
+        ];
 
   return (
     <div className="space-y-4 text-xs">
@@ -1314,64 +1439,82 @@ function ContractAnalysisDetail({
         </div>
       </div>
 
-      {/* Rekomendasi Surveyor AO & Credit Analyst */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="rounded-lg border border-border/80 p-3 space-y-1.5 bg-background">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" /> Rekomendasi Surveyor / AO
+      {/* Tabel Alur Proses Pengajuan Kredit & Rekomendasi Petugas */}
+      <div className="rounded-xl border border-border/80 bg-background overflow-hidden shadow-xs">
+        <div className="bg-muted/40 px-3.5 py-2.5 border-b border-border/80 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded bg-primary/10 text-primary">
+              <CheckCircle2 className="h-4 w-4" />
             </span>
-            <Badge variant="outline" className="text-[10px]">
-              {creditCapacity?.surveyorRecommendation?.status || 'REKOMENDASI'}
-            </Badge>
-          </div>
-          <div className="text-[11px] space-y-1 text-muted-foreground">
-            <p>
-              Plafon Usulan:{' '}
-              <span className="font-mono font-medium text-foreground">
-                {formatRupiah(creditCapacity?.surveyorRecommendation?.plafon || plafonRealisasi)}
+            <div>
+              <span className="font-semibold text-xs text-foreground block">
+                Alur Proses Pengajuan Kredit & Rekomendasi Petugas
               </span>
-              {creditCapacity?.surveyorRecommendation?.tenor ? ` (${creditCapacity.surveyorRecommendation.tenor} ${tenorUnit})` : ''}
-            </p>
-            <p>
-              Petugas AO:{' '}
-              <span className="font-medium text-foreground">
-                {creditCapacity?.surveyorRecommendation?.officerName || 'Petugas AO Lapangan'}
+              <span className="text-[10px] text-muted-foreground">
+                Tahapan alur proses pengajuan sistem dari Input Leads sampai dengan Proses Pencairan
               </span>
-            </p>
-            <p className="italic text-foreground mt-1 bg-muted/40 p-2 rounded">
-              &ldquo;{creditCapacity?.surveyorRecommendation?.keterangan || 'Usaha aktif berjalan lancar dan memenuhi kriteria kelayakan pembiayaan.'}&rdquo;
-            </p>
+            </div>
           </div>
+          <Badge variant="outline" className="text-[10px] font-mono">
+            {isCertificateProduct ? 'Pinjaman Sertifikat (Tenor Bulanan)' : 'Pembiayaan Mikro UMI (Tenor Mingguan)'}
+          </Badge>
         </div>
 
-        <div className="rounded-lg border border-border/80 p-3 space-y-1.5 bg-background">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-xs text-foreground flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Rekomendasi Credit Analyst
-            </span>
-            <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-500/30">
-              {creditCapacity?.analystRecommendation?.status || 'REKOMENDASI'}
-            </Badge>
-          </div>
-          <div className="text-[11px] space-y-1 text-muted-foreground">
-            <p>
-              Plafon Disetujui:{' '}
-              <span className="font-mono font-medium text-foreground">
-                {formatRupiah(creditCapacity?.analystRecommendation?.plafon || plafonRealisasi)}
-              </span>
-              {creditCapacity?.analystRecommendation?.tenor ? ` (${creditCapacity.analystRecommendation.tenor} ${tenorUnit})` : ''}
-            </p>
-            <p>
-              Analis Kredit:{' '}
-              <span className="font-medium text-foreground">
-                {creditCapacity?.analystRecommendation?.analystName || 'Analis Kredit Cabang'}
-              </span>
-            </p>
-            <p className="italic text-foreground mt-1 bg-muted/40 p-2 rounded">
-              &ldquo;{creditCapacity?.analystRecommendation?.keterangan || 'Kapasitas bayar (DSR) sehat dan kemampuan angsuran memadai untuk direalisasikan.'}&rdquo;
-            </p>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-muted/30 border-b border-border/60 text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+              <tr>
+                <th className="py-2.5 px-3 text-center w-12">Step</th>
+                <th className="py-2.5 px-3 w-48">Tahap / Alur Proses</th>
+                <th className="py-2.5 px-3 w-40">Waktu & Tanggal</th>
+                <th className="py-2.5 px-3 w-52">Petugas Pelaksana</th>
+                <th className="py-2.5 px-3 w-48 text-right">Rekomendasi / Nilai</th>
+                <th className="py-2.5 px-3 w-32 text-center">Status</th>
+                <th className="py-2.5 px-3 min-w-[240px]">Catatan & Keterangan</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {steps.map((s) => (
+                <tr key={s.stepNumber} className="hover:bg-muted/20 transition-colors">
+                  <td className="py-3 px-3 text-center align-top">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[11px]">
+                      {s.stepNumber}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 align-top">
+                    <span className="font-semibold text-foreground block">{s.stepName}</span>
+                    <span className="text-[10px] text-muted-foreground">{s.officerRole || '-'}</span>
+                  </td>
+                  <td className="py-3 px-3 text-muted-foreground whitespace-nowrap text-[11px] align-top">
+                    {s.tanggal ? formatDateTime(s.tanggal) : '-'}
+                  </td>
+                  <td className="py-3 px-3 align-top">
+                    <span className="font-semibold text-foreground block text-[11px]">
+                      {s.officerName}
+                    </span>
+                    {s.officerUsername && (
+                      <span className="text-[10px] font-mono text-muted-foreground block truncate max-w-[180px]">
+                        @{s.officerUsername}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono font-medium text-foreground whitespace-nowrap align-top">
+                    {s.nominalText || (s.plafon ? `${formatRupiah(s.plafon)} (${s.tenor} ${tenorUnit})` : '-')}
+                  </td>
+                  <td className="py-3 px-3 text-center whitespace-nowrap align-top">
+                    <Badge variant={getStepStatusBadgeVariant(s.status)} className="text-[10px] py-0.5 px-2">
+                      {s.status}
+                    </Badge>
+                  </td>
+                  <td className="py-3 px-3 text-muted-foreground text-[11px] align-top">
+                    <p className="italic text-foreground/90 bg-muted/30 p-2 rounded border border-border/30">
+                      &ldquo;{s.keterangan || '-'}&rdquo;
+                    </p>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

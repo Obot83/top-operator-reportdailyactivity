@@ -7,11 +7,18 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 const MONGODB_DIR = path.resolve(process.cwd(), 'mongodb');
-let cachedUserDirectory: Map<string, { name: string; branch: string }> | null = null;
 
-function loadUserDirectory(): Map<string, { name: string; branch: string }> {
+interface UserDirectoryEntry {
+  name: string;
+  branch: string;
+  jabatan: string;
+}
+
+let cachedUserDirectory: Map<string, UserDirectoryEntry> | null = null;
+
+function loadUserDirectory(): Map<string, UserDirectoryEntry> {
   if (cachedUserDirectory) return cachedUserDirectory;
-  const map = new Map<string, { name: string; branch: string }>();
+  const map = new Map<string, UserDirectoryEntry>();
   const csvPath = path.join(MONGODB_DIR, 'kospinus001.users_app.csv');
   if (fs.existsSync(csvPath)) {
     try {
@@ -25,7 +32,7 @@ function loadUserDirectory(): Map<string, { name: string; branch: string }> {
         const name = parts[1]?.trim();
         const branch = parts[21]?.trim();
         if (id && name) {
-          map.set(id, { name, branch: branch || '' });
+          map.set(id.toLowerCase(), { name, branch: branch || '', jabatan: 'Account Officer' });
         }
       }
     } catch (e) {
@@ -33,6 +40,61 @@ function loadUserDirectory(): Map<string, { name: string; branch: string }> {
     }
   }
   cachedUserDirectory = map;
+  return map;
+}
+
+let cachedMongoUserDirectory: Map<string, UserDirectoryEntry> | null = null;
+
+async function loadMongoUserDirectory(db: any): Promise<Map<string, UserDirectoryEntry>> {
+  if (cachedMongoUserDirectory && cachedMongoUserDirectory.size > 0) {
+    return cachedMongoUserDirectory;
+  }
+  const map = new Map<string, UserDirectoryEntry>();
+
+  // 1. Ambil dari collection users_app (lapangan, AO, surveyor)
+  try {
+    const appUsers = await db.collection('users_app').find({}).toArray();
+    for (const u of appUsers) {
+      const rawName = typeof u.name === 'string' ? u.name.trim() : '';
+      if (!rawName) continue;
+      const branch = u.profile?.branch?.name || '';
+      const jabatan = u.profile?.karyawan?.jabatan || u.user_type || 'Account Officer';
+      const entry: UserDirectoryEntry = { name: rawName, branch, jabatan };
+      if (u._id) map.set(String(u._id).toLowerCase().trim(), entry);
+      if (u.id) map.set(String(u.id).toLowerCase().trim(), entry);
+      if (u.username) map.set(String(u.username).toLowerCase().trim(), entry);
+      if (u.email) map.set(String(u.email).toLowerCase().trim(), entry);
+    }
+  } catch (e) {
+    console.warn('[debitur-controller] failed to load users_app from mongo', e);
+  }
+
+  // 2. Ambil dari collection users_client (backoffice, KC, KAOP, CA)
+  try {
+    const clientUsers = await db.collection('users_client').find({}).toArray();
+    for (const u of clientUsers) {
+      const rawName = typeof u.name === 'string' ? u.name.trim() : '';
+      if (!rawName) continue;
+      const branch = u.branch?.name || '';
+      const jabatan = u.profile?.jabatan || u.jabatan || u.group_name || 'Petugas Operasional';
+      const entry: UserDirectoryEntry = { name: rawName, branch, jabatan };
+      if (u._id) map.set(String(u._id).toLowerCase().trim(), entry);
+      if (u.username) map.set(String(u.username).toLowerCase().trim(), entry);
+      if (u.email) map.set(String(u.email).toLowerCase().trim(), entry);
+    }
+  } catch (e) {
+    console.warn('[debitur-controller] failed to load users_client from mongo', e);
+  }
+
+  // 3. Fallback CSV jika map masih kosong
+  if (map.size === 0) {
+    const csvMap = loadUserDirectory();
+    for (const [k, v] of csvMap.entries()) {
+      map.set(k.toLowerCase(), v);
+    }
+  }
+
+  cachedMongoUserDirectory = map;
   return map;
 }
 
@@ -45,28 +107,62 @@ function toTitleCase(str: string): string {
     .join(' ');
 }
 
-function resolveOfficerName(
+function formatRp(amount: number): string {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function resolveOfficerInfo(
   uid: string | undefined | null,
   fallbackName?: string,
-  userDirectory?: Map<string, { name: string; branch: string }>
-): string {
-  if (!uid && !fallbackName) return '-';
-  const cleanId = (uid || '').trim();
-  if (!cleanId) return toTitleCase(fallbackName || '-');
-
-  const uMap = userDirectory || loadUserDirectory();
+  fallbackRole?: string,
+  userDirectory?: Map<string, UserDirectoryEntry>
+): { name: string; role: string; branch: string } {
+  if (!uid && !fallbackName) return { name: '-', role: fallbackRole || '-', branch: '-' };
+  const cleanId = (uid || '').trim().toLowerCase();
   const baseId = cleanId.replace(/_(sur|col)$/i, '');
-  const userRec = uMap.get(cleanId) || uMap.get(baseId);
-  let name = userRec?.name || '';
-  if (!name && fallbackName) name = fallbackName;
+
+  if (userDirectory) {
+    const found = userDirectory.get(cleanId) || userDirectory.get(baseId);
+    if (found) {
+      return {
+        name: toTitleCase(found.name),
+        role: found.jabatan || fallbackRole || 'Petugas Pembiayaan',
+        branch: found.branch || '-',
+      };
+    }
+  }
+
+  let name = fallbackName || '';
   if (!name) {
     if (cleanId.includes('@')) {
-      name = cleanId.split('@')[0].replace(/[._]/g, ' ');
+      const prefix = cleanId.split('@')[0];
+      if (prefix === 'admintes') {
+        name = 'Admin Pembiayaan (Kodein)';
+      } else {
+        name = prefix.replace(/[._]/g, ' ');
+      }
     } else {
       name = baseId.replace(/[_-]/g, ' ');
     }
   }
-  return toTitleCase(name || cleanId);
+
+  return {
+    name: toTitleCase(name || cleanId),
+    role: fallbackRole || 'Petugas Lapangan',
+    branch: '-',
+  };
+}
+
+function resolveOfficerName(
+  uid: string | undefined | null,
+  fallbackName?: string,
+  userDirectory?: Map<string, UserDirectoryEntry>
+): string {
+  return resolveOfficerInfo(uid, fallbackName, undefined, userDirectory).name;
 }
 import type {
   DebiturControllerData,
@@ -83,6 +179,7 @@ import type {
   DebtorOtherContractItem,
   DebtorDocumentItem,
   DebtorJobCapacity,
+  LoanProcessStep,
 } from '@/shared/types';
 
 function categorizeAgunanFile(f: any): { category: DebtorCollateralFile['category']; categoryLabel: string } {
@@ -810,11 +907,17 @@ export async function GET(
         const surveyorRec = lead?.rekomendasi?.surveyor;
         const analystRec = lead?.rekomendasi?.credit_analyst;
 
-        const uDir = loadUserDirectory();
+        const uDir = await loadMongoUserDirectory(db);
 
         // 1. Data Pengajuan AO
         const aoUsername = pengajuan?.create_user || lead?.create_user || contract.sales?.id || undefined;
-        const aoName = resolveOfficerName(aoUsername, contract.sales?.name || 'Petugas AO', uDir);
+        const aoOfficerInfo = resolveOfficerInfo(
+          aoUsername,
+          contract.sales?.name || 'Petugas AO',
+          'Account Officer (Sales)',
+          uDir
+        );
+        const aoName = aoOfficerInfo.name;
         const tanggalPengajuan = pengajuan?.create_dtm
           ? new Date(pengajuan.create_dtm).toISOString()
           : lead?.create_dtm
@@ -839,7 +942,13 @@ export async function GET(
           lead?.credit_checking?.done_by ||
           lead?.credit_checking?.subbmitted_by ||
           aoUsername;
-        const slikOfficerName = resolveOfficerName(slikOfficerUid, aoName, uDir);
+        const slikOfficerInfo = resolveOfficerInfo(
+          slikOfficerUid,
+          aoName,
+          'Petugas Cek SLIK & CBI',
+          uDir
+        );
+        const slikOfficerName = slikOfficerInfo.name;
         const slikTanggalRaw =
           lead?.credit_checking?.done_dtm ||
           lead?.credit_checking?.checked_dtm ||
@@ -857,22 +966,170 @@ export async function GET(
           surveyorRec?.by ||
           lead?.assign?.to_surveyor ||
           (aoUsername ? `${aoUsername.replace(/_(sur|col)$/i, '')}_sur` : undefined);
-        const surveyorOfficerName = resolveOfficerName(surOfficerUid, 'Surveyor Lapangan', uDir);
+        const surveyorOfficerInfo = resolveOfficerInfo(
+          surOfficerUid,
+          'Surveyor Lapangan',
+          'Surveyor Cabang',
+          uDir
+        );
+        const surveyorOfficerName = surveyorOfficerInfo.name;
         const tanggalSurveyRaw = lead?.survey_dtm || surveyorRec?.create_dtm || lead?.update_dtm || tanggalPengajuan;
         const tanggalSurvey = tanggalSurveyRaw ? new Date(tanggalSurveyRaw).toISOString() : undefined;
+        const surveyorLoan =
+          Number(surveyorRec?.submission?.loan?.$numberDecimal || surveyorRec?.submission?.loan) ||
+          submissionLoan;
+        const surveyorTenor = Number(surveyorRec?.submission?.tenor) || submissionTenor;
 
         // 4. Rekomendasi CA
         const caOfficerUid = analystRec?.by || 'analyst_memorandum';
-        const caOfficerName = resolveOfficerName(caOfficerUid, 'Credit Analyst Memorandum', uDir);
+        const caOfficerInfo = resolveOfficerInfo(
+          caOfficerUid,
+          'Credit Analyst Memorandum',
+          'Credit Analyst (Kaops)',
+          uDir
+        );
+        const caOfficerName = caOfficerInfo.name;
         const tanggalCaRaw =
           analystRec?.create_dtm || lead?.credit_checking?.done_dtm || lead?.update_dtm || tanggalPengajuan;
         const tanggalCa = tanggalCaRaw ? new Date(tanggalCaRaw).toISOString() : undefined;
+        const analystLoan =
+          Number(analystRec?.submission?.loan?.$numberDecimal || analystRec?.submission?.loan) ||
+          submissionLoan;
+        const analystTenor = Number(analystRec?.submission?.tenor) || submissionTenor;
 
         // 5. Rekomendasi Komite
         const komiteOfficerUid = lead?.update_user || 'komite_approval';
-        const komiteOfficerName = resolveOfficerName(komiteOfficerUid, 'Petugas Approval Memorandum / KC', uDir);
+        const komiteOfficerInfo = resolveOfficerInfo(
+          komiteOfficerUid,
+          'Petugas Approval Memorandum / KC',
+          'Ketua Komite (Kepala Cabang)',
+          uDir
+        );
+        const komiteOfficerName = komiteOfficerInfo.name;
         const tanggalKomiteRaw = lead?.update_dtm || contract.startDate || tanggalCaRaw;
         const tanggalKomite = tanggalKomiteRaw ? new Date(tanggalKomiteRaw).toISOString() : undefined;
+
+        // 6. Pencairan & Realisasi (Booking)
+        const pencairanOfficerUid = contract.create_user || 'admin_cair';
+        const pencairanOfficerInfo = resolveOfficerInfo(
+          pencairanOfficerUid,
+          'Admin Pembiayaan (Kodein)',
+          'Admin Booking & Pencairan',
+          uDir
+        );
+        const tanggalPencairanRaw = contract.contract_date || contract.create_dtm || contract.startDate || tanggalKomiteRaw;
+        const tanggalPencairan = tanggalPencairanRaw ? new Date(tanggalPencairanRaw).toISOString() : undefined;
+
+        const tenorUnit = isCertificateProduct ? 'Bulan' : 'Minggu';
+
+        const processSteps: LoanProcessStep[] = [
+          {
+            stepNumber: 1,
+            stepName: 'Input Data Leads (AO)',
+            stepKey: 'INPUT_LEADS',
+            tanggal: tanggalPengajuan,
+            officerName: aoOfficerInfo.name,
+            officerRole: aoOfficerInfo.role || 'Account Officer (Sales)',
+            officerUsername: aoUsername,
+            plafon: submissionLoan,
+            tenor: submissionTenor,
+            tenorType: submissionTenorType,
+            nominalText: `${formatRp(submissionLoan)} (${submissionTenor} ${tenorUnit})`,
+            status: 'Disubmit (Selesai Mandatory)',
+            keterangan:
+              lead?.keterangan?.sales ||
+              pengajuan?.loan_purpose?.name ||
+              'Pengajuan awal pembiayaan dan kelengkapan dokumen debitur berhasil diinput ke sistem.',
+            badgeVariant: 'secondary',
+          },
+          {
+            stepNumber: 2,
+            stepName: 'Pengecekan SLIK & CBI Gateway',
+            stepKey: 'CEK_SLIK',
+            tanggal: slikTanggal,
+            officerName: slikOfficerInfo.name,
+            officerRole: slikOfficerInfo.role || 'Petugas Cek SLIK & CBI',
+            officerUsername: slikOfficerUid || undefined,
+            plafon: submissionLoan,
+            nominalText: `Score CBI: ${cbiScoreVal}`,
+            status: slikStatus === 'Approve' ? 'Lolos Cek SLIK (Approve)' : 'Ditolak (Reject)',
+            keterangan:
+              slikStatus === 'Approve'
+                ? 'Hasil pengecekan SLIK OJK & BI Checking lolos batas toleransi kolektibilitas.'
+                : 'Pengecekan SLIK belum memenuhi kriteria kolektibilitas lancar.',
+            badgeVariant: slikStatus === 'Approve' ? 'success' : 'warning',
+          },
+          {
+            stepNumber: 3,
+            stepName: 'Survei Lapangan (Surveyor)',
+            stepKey: 'SURVEI_LAPANGAN',
+            tanggal: tanggalSurvey,
+            officerName: surveyorOfficerInfo.name,
+            officerRole: surveyorOfficerInfo.role || 'Surveyor Lapangan',
+            officerUsername: surOfficerUid || undefined,
+            plafon: surveyorLoan,
+            tenor: surveyorTenor,
+            tenorType: submissionTenorType,
+            nominalText: `${formatRp(surveyorLoan)} (${surveyorTenor} ${tenorUnit})`,
+            status: surveyorRec?.status || 'Rekomendasi Survei',
+            keterangan:
+              surveyorRec?.keterangan ||
+              'Hasil survei lapangan rekomendasi, kondisi usaha aktif dan kooperatif.',
+            badgeVariant: 'info',
+          },
+          {
+            stepNumber: 4,
+            stepName: 'Rekomendasi Credit Analyst (CA)',
+            stepKey: 'REKOMENDASI_CA',
+            tanggal: tanggalCa,
+            officerName: caOfficerInfo.name,
+            officerRole: caOfficerInfo.role || 'Credit Analyst (Kaops)',
+            officerUsername: caOfficerUid || undefined,
+            plafon: analystLoan,
+            tenor: analystTenor,
+            tenorType: submissionTenorType,
+            nominalText: `${formatRp(analystLoan)} (${analystTenor} ${tenorUnit})`,
+            status: analystRec?.status || 'Rekomendasi Analis',
+            keterangan:
+              analystRec?.keterangan ||
+              'Kapasitas bayar (DSR) sehat dan kemampuan angsuran memadai untuk direalisasikan.',
+            badgeVariant: 'info',
+          },
+          {
+            stepNumber: 5,
+            stepName: 'Review & Persetujuan Komite Kredit',
+            stepKey: 'REVIEW_KOMITE',
+            tanggal: tanggalKomite,
+            officerName: komiteOfficerInfo.name,
+            officerRole: komiteOfficerInfo.role || 'Ketua Komite (Kepala Cabang)',
+            officerUsername: komiteOfficerUid || undefined,
+            plafon: plafon,
+            tenor: tenor,
+            tenorType: submissionTenorType,
+            nominalText: `${formatRp(plafon)} (${tenor} ${tenorUnit})`,
+            status: 'Disetujui Komite (Approved)',
+            keterangan:
+              'Persetujuan komite kredit sesuai memorandum analisis, hasil survei, dan verifikasi dokumen pemohon.',
+            badgeVariant: 'success',
+          },
+          {
+            stepNumber: 6,
+            stepName: 'Pencairan & Realisasi (Booking)',
+            stepKey: 'PENCAIRAN',
+            tanggal: tanggalPencairan,
+            officerName: pencairanOfficerInfo.name,
+            officerRole: pencairanOfficerInfo.role || 'Admin Operasional / Booking',
+            officerUsername: contract.create_user || undefined,
+            plafon: plafon,
+            tenor: tenor,
+            tenorType: submissionTenorType,
+            nominalText: `${formatRp(plafon)} (${tenor} ${tenorUnit})`,
+            status: 'Selesai Pencairan (Cair)',
+            keterangan:
+              'Fasilitas pembiayaan telah ditandatangani akad dan dana pokok berhasil dicairkan ke rekening pemohon.',
+            badgeVariant: 'success',
+          },
+        ];
 
         const creditCapacity: DebtorCreditCapacity = {
           plafonPengajuan: submissionLoan,
@@ -906,10 +1163,8 @@ export async function GET(
           },
           surveyorRecommendation: {
             status: surveyorRec?.status || 'REKOMENDASI',
-            plafon:
-              Number(surveyorRec?.submission?.loan?.$numberDecimal || surveyorRec?.submission?.loan) ||
-              submissionLoan,
-            tenor: Number(surveyorRec?.submission?.tenor) || submissionTenor,
+            plafon: surveyorLoan,
+            tenor: surveyorTenor,
             keterangan:
               surveyorRec?.keterangan ||
               'Hasil survei lapangan rekomendasi, kondisi usaha aktif dan kooperatif.',
@@ -919,10 +1174,8 @@ export async function GET(
           },
           analystRecommendation: {
             status: analystRec?.status || 'REKOMENDASI',
-            plafon:
-              Number(analystRec?.submission?.loan?.$numberDecimal || analystRec?.submission?.loan) ||
-              submissionLoan,
-            tenor: Number(analystRec?.submission?.tenor) || submissionTenor,
+            plafon: analystLoan,
+            tenor: analystTenor,
             keterangan:
               analystRec?.keterangan ||
               'Kapasitas bayar (DSR) sehat dan kemampuan angsuran memadai untuk direalisasikan.',
@@ -940,6 +1193,17 @@ export async function GET(
             approverUsername: komiteOfficerUid || undefined,
             tanggalProses: tanggalKomite,
           },
+          pencairan: {
+            status: 'CAIR',
+            plafon,
+            tenor,
+            tanggalCair: tanggalPencairan,
+            officerName: pencairanOfficerInfo.name,
+            officerUsername: contract.create_user || undefined,
+            keterangan:
+              'Fasilitas pembiayaan telah ditandatangani akad dan dana pokok berhasil dicairkan ke rekening pemohon.',
+          },
+          processSteps,
           angsuranEstimasi: angsuranPokok + angsuranBunga,
           saldoTitipan,
         };
@@ -952,6 +1216,93 @@ export async function GET(
             (oc.productName || '').toUpperCase().includes('SERTIFIKAT') ||
             oc.plafon > 15000000;
           const ocTenorType = ocIsCert ? 'BULAN' : 'MINGGU';
+          const ocTenorUnit = ocIsCert ? 'Bulan' : 'Minggu';
+          const ocDateStr = oc.contractDate ? new Date(oc.contractDate).toISOString() : undefined;
+
+          const ocSteps: LoanProcessStep[] = [
+            {
+              stepNumber: 1,
+              stepName: 'Input Data Leads (AO)',
+              stepKey: 'INPUT_LEADS',
+              tanggal: ocDateStr,
+              officerName: contract.sales?.name || aoOfficerInfo.name,
+              officerRole: 'Account Officer (Sales)',
+              plafon: oc.plafon,
+              tenor: oc.tenor,
+              tenorType: ocTenorType,
+              nominalText: `${formatRp(oc.plafon)} (${oc.tenor} ${ocTenorUnit})`,
+              status: 'Disubmit',
+              keterangan: 'Pengajuan fasilitas pembiayaan debitur diinput oleh AO.',
+            },
+            {
+              stepNumber: 2,
+              stepName: 'Pengecekan SLIK & CBI Gateway',
+              stepKey: 'CEK_SLIK',
+              tanggal: ocDateStr,
+              officerName: contract.sales?.name || aoOfficerInfo.name,
+              officerRole: 'Petugas Cek SLIK & CBI',
+              nominalText: 'Lolos CBI (Grade A)',
+              status: 'Approve',
+              keterangan: 'Hasil pengecekan SLIK OJK & BI Checking lolos kriteria.',
+            },
+            {
+              stepNumber: 3,
+              stepName: 'Survei Lapangan (Surveyor)',
+              stepKey: 'SURVEI_LAPANGAN',
+              tanggal: ocDateStr,
+              officerName: surveyorOfficerInfo.name,
+              officerRole: 'Surveyor Cabang',
+              plafon: oc.plafon,
+              tenor: oc.tenor,
+              tenorType: ocTenorType,
+              nominalText: `${formatRp(oc.plafon)} (${oc.tenor} ${ocTenorUnit})`,
+              status: 'Rekomendasi',
+              keterangan: 'Kelayakan survei memenuhi kriteria pembiayaan.',
+            },
+            {
+              stepNumber: 4,
+              stepName: 'Rekomendasi Credit Analyst (CA)',
+              stepKey: 'REKOMENDASI_CA',
+              tanggal: ocDateStr,
+              officerName: caOfficerInfo.name,
+              officerRole: 'Credit Analyst',
+              plafon: oc.plafon,
+              tenor: oc.tenor,
+              tenorType: ocTenorType,
+              nominalText: `${formatRp(oc.plafon)} (${oc.tenor} ${ocTenorUnit})`,
+              status: 'Rekomendasi',
+              keterangan: 'Plafond dan kemampuan bayar disetujui komite.',
+            },
+            {
+              stepNumber: 5,
+              stepName: 'Review & Persetujuan Komite Kredit',
+              stepKey: 'REVIEW_KOMITE',
+              tanggal: ocDateStr,
+              officerName: komiteOfficerInfo.name,
+              officerRole: 'Ketua Komite Kredit',
+              plafon: oc.plafon,
+              tenor: oc.tenor,
+              tenorType: ocTenorType,
+              nominalText: `${formatRp(oc.plafon)} (${oc.tenor} ${ocTenorUnit})`,
+              status: 'Disetujui',
+              keterangan: 'Disetujui komite pembiayaan sesuai memorandum persetujuan.',
+            },
+            {
+              stepNumber: 6,
+              stepName: 'Pencairan & Realisasi (Booking)',
+              stepKey: 'PENCAIRAN',
+              tanggal: ocDateStr,
+              officerName: pencairanOfficerInfo.name,
+              officerRole: 'Admin Booking & Realisasi',
+              plafon: oc.plafon,
+              tenor: oc.tenor,
+              tenorType: ocTenorType,
+              nominalText: `${formatRp(oc.plafon)} (${oc.tenor} ${ocTenorUnit})`,
+              status: 'Cair',
+              keterangan: 'Fasilitas pembiayaan telah direalisasikan dan dicairkan.',
+            },
+          ];
+
           return {
             ...oc,
             creditCapacity: oc.isCurrent
@@ -962,19 +1313,19 @@ export async function GET(
                   tenorType: ocTenorType,
                   loanPurpose: 'Modal Usaha (Produktif)',
                   scoringGrade: 'A',
-                  tanggalPengajuan: oc.contractDate ? new Date(oc.contractDate).toISOString() : undefined,
-                  aoName: contract.sales?.name || 'Petugas AO Lapangan',
+                  tanggalPengajuan: ocDateStr,
+                  aoName: contract.sales?.name || aoOfficerInfo.name,
                   aoUsername: contract.sales?.id || 'ao_lapangan',
                   officersSummary: {
-                    salesAo: contract.sales?.name || 'Petugas AO Lapangan',
-                    surveyor: 'Surveyor Cabang',
-                    creditAnalyst: 'Credit Analyst Memorandum',
-                    approvalKomite: 'Petugas Approval Memorandum',
+                    salesAo: contract.sales?.name || aoOfficerInfo.name,
+                    surveyor: surveyorOfficerInfo.name,
+                    creditAnalyst: caOfficerInfo.name,
+                    approvalKomite: komiteOfficerInfo.name,
                   },
                   slikChecking: {
                     status: 'Approve',
-                    tanggalPengecekan: oc.contractDate ? new Date(oc.contractDate).toISOString() : undefined,
-                    officerName: contract.sales?.name || 'Petugas Pengecekan',
+                    tanggalPengecekan: ocDateStr,
+                    officerName: contract.sales?.name || aoOfficerInfo.name,
                     cbiScore: 'Lolos CBI (Grade A)',
                     keterangan: 'Hasil pengecekan SLIK OJK & BI Checking lolos kriteria.',
                   },
@@ -983,25 +1334,34 @@ export async function GET(
                     plafon: oc.plafon,
                     tenor: oc.tenor,
                     keterangan: 'Kelayakan survei memenuhi kriteria pembiayaan.',
-                    officerName: 'Surveyor Cabang',
-                    tanggalSurvey: oc.contractDate ? new Date(oc.contractDate).toISOString() : undefined,
+                    officerName: surveyorOfficerInfo.name,
+                    tanggalSurvey: ocDateStr,
                   },
                   analystRecommendation: {
                     status: 'REKOMENDASI',
                     plafon: oc.plafon,
                     tenor: oc.tenor,
                     keterangan: 'Plafond dan kemampuan bayar disetujui komite.',
-                    analystName: 'Credit Analyst Memorandum',
-                    tanggalProses: oc.contractDate ? new Date(oc.contractDate).toISOString() : undefined,
+                    analystName: caOfficerInfo.name,
+                    tanggalProses: ocDateStr,
                   },
                   komiteRecommendation: {
                     status: 'DISETUJUI',
                     plafon: oc.plafon,
                     tenor: oc.tenor,
                     keterangan: 'Disetujui komite pembiayaan sesuai memorandum persetujuan.',
-                    approverName: 'Petugas Approval Memorandum',
-                    tanggalProses: oc.contractDate ? new Date(oc.contractDate).toISOString() : undefined,
+                    approverName: komiteOfficerInfo.name,
+                    tanggalProses: ocDateStr,
                   },
+                  pencairan: {
+                    status: 'CAIR',
+                    plafon: oc.plafon,
+                    tenor: oc.tenor,
+                    tanggalCair: ocDateStr,
+                    officerName: pencairanOfficerInfo.name,
+                    keterangan: 'Fasilitas pembiayaan telah direalisasikan dan dicairkan.',
+                  },
+                  processSteps: ocSteps,
                   angsuranEstimasi: Math.round(
                     (oc.plafon / (oc.tenor || (ocIsCert ? 12 : 30))) * 1.15
                   ),
