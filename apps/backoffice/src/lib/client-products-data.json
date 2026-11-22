@@ -1,0 +1,2284 @@
+[{
+  "_id": "001",
+  "client_id": "001",
+  "product_name": "PINJAMAN - INVESTASI",
+  "product_description": "<p>PINJAMAN - INVESTASI</p>",
+  "term": "Term of product kredit not umi",
+  "certificates": [],
+  "interest_rate_type": "anuitas",
+  "submission_loan": {
+    "max": 500000000,
+    "min": 0
+  },
+  "submission_tenors": {
+    "dtl": [
+      {
+        "_id": "12M",
+        "seq": 120,
+        "type": "BULAN",
+        "tenor": 12,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.3
+      },
+      {
+        "_id": "18M",
+        "seq": 180,
+        "type": "BULAN",
+        "tenor": 18,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.3
+      },
+      {
+        "_id": "24M",
+        "seq": 240,
+        "type": "BULAN",
+        "tenor": 24,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.4
+      },
+      {
+        "_id": "36M",
+        "seq": 360,
+        "type": "BULAN",
+        "tenor": 36,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      },
+      {
+        "_id": "48M",
+        "seq": 480,
+        "type": "BULAN",
+        "tenor": 48,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      },
+      {
+        "_id": "60M",
+        "seq": 600,
+        "type": "BULAN",
+        "tenor": 60,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      }
+    ]
+  },
+  "paket": null,
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": 0
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": 0
+    }
+  ],
+  "use_ltv": false,
+  "ltv_value": null,
+  "flg": {
+    "used": true
+  },
+  "create_user": 0,
+  "create_dtm": {
+    "$date": "2025-01-26T12:04:48.000Z"
+  },
+  "update_user": "serly",
+  "update_dtm": {
+    "$date": "2026-10-26T09:17:42.000Z"
+  }
+},
+{
+  "_id": "002",
+  "client_id": "001",
+  "product_name": "PINJAMAN - KONSUMTIF",
+  "product_description": "<p>PINJAMAN - KONSUMTIF</p>",
+  "term": "Term of product kredit not umi",
+  "certificates": [],
+  "interest_rate_type": "anuitas",
+  "submission_loan": {
+    "max": 500000000,
+    "min": 0
+  },
+  "submission_tenors": {
+    "dtl": [
+      {
+        "_id": "12M",
+        "seq": 120,
+        "type": "BULAN",
+        "tenor": 12,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.3
+      },
+      {
+        "_id": "18M",
+        "seq": 180,
+        "type": "BULAN",
+        "tenor": 18,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.3
+      },
+      {
+        "_id": "24M",
+        "seq": 240,
+        "type": "BULAN",
+        "tenor": 24,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.4
+      },
+      {
+        "_id": "36M",
+        "seq": 360,
+        "type": "BULAN",
+        "tenor": 36,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      },
+      {
+        "_id": "48M",
+        "seq": 480,
+        "type": "BULAN",
+        "tenor": 48,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      },
+      {
+        "_id": "60M",
+        "seq": 600,
+        "type": "BULAN",
+        "tenor": 60,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      }
+    ]
+  },
+  "paket": null,
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": 0
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": 0
+    }
+  ],
+  "use_ltv": false,
+  "ltv_value": null,
+  "flg": {
+    "used": false,
+    "deleted": false
+  },
+  "create_user": 0,
+  "create_dtm": {
+    "$date": "2025-01-26T12:04:48.000Z"
+  },
+  "update_user": "kc_bekasi2@gmail.com",
+  "update_dtm": {
+    "$date": "2026-09-29T03:19:17.000Z"
+  }
+},
+{
+  "_id": "003",
+  "client_id": "001",
+  "product_name": "PINJAMAN - MODAL KERJA",
+  "product_description": "<p>PINJAMAN - MODAL KERJA</p>",
+  "term": "Term of product kredit not umi",
+  "certificates": null,
+  "interest_rate_type": "anuitas",
+  "submission_loan": {
+    "max": 500000000,
+    "min": 0
+  },
+  "submission_tenors": {
+    "dtl": [
+      {
+        "_id": "12M",
+        "seq": 120,
+        "type": "BULAN",
+        "tenor": 12,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.3
+      },
+      {
+        "_id": "18M",
+        "seq": 180,
+        "type": "BULAN",
+        "tenor": 18,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.3
+      },
+      {
+        "_id": "24M",
+        "seq": 240,
+        "type": "BULAN",
+        "tenor": 24,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.4
+      },
+      {
+        "_id": "36M",
+        "seq": 360,
+        "type": "BULAN",
+        "tenor": 36,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      },
+      {
+        "_id": "48M",
+        "seq": 480,
+        "type": "BULAN",
+        "tenor": 48,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      },
+      {
+        "_id": "60M",
+        "seq": 600,
+        "type": "BULAN",
+        "tenor": 60,
+        "active": true,
+        "type_id": "BL",
+        "interest_rate": 1.5
+      }
+    ]
+  },
+  "paket": null,
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": 0
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": 0
+    }
+  ],
+  "use_ltv": false,
+  "ltv_value": null,
+  "flg": {
+    "used": true
+  },
+  "create_user": "\"SystemService\"",
+  "create_dtm": {
+    "$date": "2025-01-26T12:04:48.000Z"
+  },
+  "update_user": "sriwulandari",
+  "update_dtm": {
+    "$date": "2026-04-24T03:23:47.000Z"
+  }
+},
+{
+  "_id": "005",
+  "client_id": "001",
+  "product_name": "PINJAMAN - UMI",
+  "product_description": "<p>PINJAMAN - UMI</p>",
+  "term": "<ul><li>Wajib berkelompok</li><li>Wajib memiliki 5 anggota dalam 1 kelompok</li><li>Wajib memiliki ketua kelompok</li></ul>",
+  "certificates": [],
+  "interest_rate_type": "fixed",
+  "submission_loan": {
+    "max": 7788000,
+    "min": 1888000
+  },
+  "submission_tenors": null,
+  "paket": [
+    {
+      "_id": "001",
+      "utj": 160000,
+      "name": "New UMI (1,8 / 30)",
+      "tenor": 30,
+      "plafon": 1888000,
+      "angsuran": 72000,
+      "tabungan": 5000,
+      "suku_bunga": 46.347,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 112000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 21000
+        }
+      ],
+      "flg": {
+        "used": true
+      }
+    },
+    {
+      "_id": "020",
+      "utj": 210000,
+      "name": "New UMI (2,5 / 30)",
+      "tenor": 30,
+      "plafon": 2541000,
+      "angsuran": 97000,
+      "tabungan": 5000,
+      "suku_bunga": 46.703,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 210000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 21000
+        }
+      ],
+      "flg": {
+        "used": true
+      }
+    },
+    {
+      "_id": "021",
+      "utj": 260000,
+      "name": "New UMI PRO (3,1 / 30)",
+      "tenor": 30,
+      "plafon": 3146000,
+      "angsuran": 119000,
+      "tabungan": 5000,
+      "suku_bunga": 43.468,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 260000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 26000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "022",
+      "utj": 260000,
+      "name": "RO UMI (3,1 / 30)",
+      "tenor": 30,
+      "plafon": 3146000,
+      "angsuran": 119000,
+      "tabungan": 5000,
+      "suku_bunga": 43.468,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 260000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 26000
+        }
+      ],
+      "flg": {
+        "used": true
+      }
+    },
+    {
+      "_id": "023",
+      "utj": 310000,
+      "name": "RO UMI (3,7 / 30)",
+      "tenor": 30,
+      "plafon": 3751000,
+      "angsuran": 142000,
+      "tabungan": 5000,
+      "suku_bunga": 43.754,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 310000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 31000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "024",
+      "utj": 360000,
+      "name": "RO UMI (4,3 / 30)",
+      "tenor": 30,
+      "plafon": 4356000,
+      "angsuran": 165000,
+      "tabungan": 5000,
+      "suku_bunga": 43.961,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 360000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 36000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "025",
+      "utj": 410000,
+      "name": "RO UMI (4,9 / 30)",
+      "tenor": 30,
+      "plafon": 4961000,
+      "angsuran": 187000,
+      "tabungan": 5000,
+      "suku_bunga": 42.238,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 410000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 41000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "026",
+      "utj": 460000,
+      "name": "RO UMI (5,5 / 30)",
+      "tenor": 30,
+      "plafon": 5566000,
+      "angsuran": 210000,
+      "tabungan": 5000,
+      "suku_bunga": 42.565,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 460000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 46000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "027",
+      "utj": 510000,
+      "name": "RO UMI (6,1 / 30)",
+      "tenor": 30,
+      "plafon": 6171000,
+      "angsuran": 232000,
+      "tabungan": 5000,
+      "suku_bunga": 41.315,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 510000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 51000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "028",
+      "utj": 560000,
+      "name": "RO UMI (6,7 / 30)",
+      "tenor": 30,
+      "plafon": 6776000,
+      "angsuran": 255000,
+      "tabungan": 5000,
+      "suku_bunga": 41.667,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 560000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 56000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "029",
+      "utj": 610000,
+      "name": "RO UMI (7,3 / 30)",
+      "tenor": 30,
+      "plafon": 7381000,
+      "angsuran": 278000,
+      "tabungan": 5000,
+      "suku_bunga": 41.96,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 610000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 61000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "030",
+      "utj": 660000,
+      "name": "RO UMI (7,9 / 30)",
+      "tenor": 30,
+      "plafon": 7986000,
+      "angsuran": 300000,
+      "tabungan": 5000,
+      "suku_bunga": 41.039,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 660000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 66000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "031",
+      "utj": 710000,
+      "name": "RO UMI (8,5 / 30)",
+      "tenor": 30,
+      "plafon": 8591000,
+      "angsuran": 322000,
+      "tabungan": 5000,
+      "suku_bunga": 40.247,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 710000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 71000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "032",
+      "utj": 760000,
+      "name": "RO UMI (9,1 / 30)",
+      "tenor": 30,
+      "plafon": 9196000,
+      "angsuran": 345000,
+      "tabungan": 5000,
+      "suku_bunga": 40.577,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 760000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 76000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "033",
+      "utj": 810000,
+      "name": "RO UMI (9,8 / 30)",
+      "tenor": 30,
+      "plafon": 9801000,
+      "angsuran": 368000,
+      "tabungan": 5000,
+      "suku_bunga": 40.866,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 810000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 81000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "034",
+      "utj": 210000,
+      "name": "New UMI (2.6 / 30)",
+      "tenor": 30,
+      "plafon": 2541000,
+      "angsuran": 98000,
+      "tabungan": 5000,
+      "suku_bunga": 50.339,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 210000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 21000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "035",
+      "utj": 260000,
+      "name": "New UMI PRO (3.2 / 30)",
+      "tenor": 30,
+      "plafon": 3146000,
+      "angsuran": 121000,
+      "tabungan": 5000,
+      "suku_bunga": 49.362,
+      "tabungan_pokok": 100000,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 260000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 26000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "036",
+      "utj": 210000,
+      "name": "RO UMI (2.6 / 30)",
+      "tenor": 30,
+      "plafon": 2541000,
+      "angsuran": 98000,
+      "tabungan": 5000,
+      "suku_bunga": 50.339,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 310000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 21000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "037",
+      "utj": 260000,
+      "name": "RO UMI (3.2 / 30)",
+      "tenor": 30,
+      "plafon": 3146000,
+      "angsuran": 121000,
+      "tabungan": 5000,
+      "suku_bunga": 49.362,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 360000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 26000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "038",
+      "utj": 310000,
+      "name": "RO UMI (3.8 / 30)",
+      "tenor": 30,
+      "plafon": 3751000,
+      "angsuran": 144000,
+      "tabungan": 5000,
+      "suku_bunga": 48.699,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 410000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 31000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "039",
+      "utj": 360000,
+      "name": "RO UMI (4.4 / 30)",
+      "tenor": 30,
+      "plafon": 4356000,
+      "angsuran": 167000,
+      "tabungan": 5000,
+      "suku_bunga": 48.22,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 460000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 36000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "040",
+      "utj": 410000,
+      "name": "RO UMI (5.0 / 30)",
+      "tenor": 30,
+      "plafon": 4961000,
+      "angsuran": 190000,
+      "tabungan": 5000,
+      "suku_bunga": 47.858,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 510000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 41000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "041",
+      "utj": 460000,
+      "name": "RO UMI (5.6 / 30)",
+      "tenor": 30,
+      "plafon": 5566000,
+      "angsuran": 214000,
+      "tabungan": 5000,
+      "suku_bunga": 49.234,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 560000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 46000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "042",
+      "utj": 510000,
+      "name": "RO UMI (6.2 / 30)",
+      "tenor": 30,
+      "plafon": 6171000,
+      "angsuran": 237000,
+      "tabungan": 5000,
+      "suku_bunga": 48.844,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 610000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 51000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "043",
+      "utj": 560000,
+      "name": "RO UMI (6.8 / 30)",
+      "tenor": 30,
+      "plafon": 6776000,
+      "angsuran": 260000,
+      "tabungan": 5000,
+      "suku_bunga": 48.523,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 660000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 56000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "044",
+      "utj": 610000,
+      "name": "RO UMI (7.4 / 30)",
+      "tenor": 30,
+      "plafon": 7381000,
+      "angsuran": 283000,
+      "tabungan": 5000,
+      "suku_bunga": 48.255,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 710000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 61000
+        }
+      ],
+      "flg": {
+        "used": false
+      }
+    },
+    {
+      "_id": "045",
+      "utj": 660000,
+      "name": "RO UMI (8.0 / 30)",
+      "tenor": 30,
+      "plafon": 7986000,
+      "angsuran": 307000,
+      "tabungan": 5000,
+      "suku_bunga": 49.184,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 760000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 66000
+        }
+      ],
+      "flg": {
+        "used": true
+      }
+    },
+    {
+      "_id": "046",
+      "utj": 710000,
+      "name": "RO UMI (8.6 / 30)",
+      "tenor": 30,
+      "plafon": 8591000,
+      "angsuran": 330000,
+      "tabungan": 5000,
+      "suku_bunga": 48.907,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 810000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 71000
+        }
+      ],
+      "flg": {
+        "used": true
+      }
+    },
+    {
+      "_id": "047",
+      "utj": 760000,
+      "name": "RO UMI (9.2 / 30)",
+      "tenor": 30,
+      "plafon": 9196000,
+      "angsuran": 353000,
+      "tabungan": 5000,
+      "suku_bunga": 48.667,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 860000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 76000
+        }
+      ],
+      "flg": {
+        "used": true
+      }
+    },
+    {
+      "_id": "048",
+      "utj": 810000,
+      "name": "RO UMI (9.8 / 30)",
+      "tenor": 30,
+      "plafon": 9801000,
+      "angsuran": 376000,
+      "tabungan": 5000,
+      "suku_bunga": 48.456,
+      "tabungan_pokok": 0,
+      "cost_managaments": [
+        {
+          "id": "ADM",
+          "name": "Biaya Administrasi",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 910000
+        },
+        {
+          "id": "DD",
+          "name": "Dana Duka",
+          "type": "FIXED",
+          "jenis": "NOMINAL",
+          "value": 81000
+        }
+      ],
+      "flg": {
+        "used": true
+      }
+    }
+  ],
+  "tenor_type": "MINGGU",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": null,
+  "use_ltv": false,
+  "ltv_value": null,
+  "flg": {
+    "used": true
+  },
+  "create_user": null,
+  "create_dtm": {
+    "$date": "1970-01-01T00:00:00.000Z"
+  },
+  "update_user": "serly",
+  "update_dtm": {
+    "$date": "2026-10-30T15:45:41.000Z"
+  },
+  "product_type": "NONSRTF"
+},
+{
+  "_id": "006",
+  "client_id": "001",
+  "product_name": "KSP (Kredit Sertifikat Pribadi)",
+  "product_description": "<p><span style=\"color: rgb(136, 136, 136);\">Produk Paling Banyak di Pilih karena bersifat universal. Cicilan ringan dibandingkan dengan kompetitor lain*, dengan kepemilikan jaminan (anggunan) atas nama sendiri/ Pasangan / Anak / Orang tua.&nbsp;</span></p>",
+  "term": "<ol><li>Karyawan, Pengusaha Kecil/ Pengusaha Mikro / Pedagang</li><li>Calon Nasabah memiliki Anggunan Berupa Sertifikat rumah (SHM/SHGB)</li></ol><p><br></p>",
+  "certificates": [
+    {
+      "type": {
+        "id": "SHM",
+        "name": "SHM"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    },
+    {
+      "type": {
+        "id": "SHGB",
+        "name": "SHGB"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    }
+  ],
+  "interest_rate_type": "fixed",
+  "submission_loan": {
+    "min": 10000000,
+    "max": 500000000
+  },
+  "submission_tenors": {
+    "data": {
+      "id": [
+        "12M",
+        "18M",
+        "24M",
+        "6M",
+        "48M",
+        "36"
+      ],
+      "interest_rate": 2
+    },
+    "dtl": [
+      {
+        "_id": "6M",
+        "tenor": 6,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 30
+      },
+      {
+        "_id": "12M",
+        "tenor": 12,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 50
+      },
+      {
+        "_id": "18M",
+        "tenor": 18,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 60
+      },
+      {
+        "_id": "24M",
+        "tenor": 24,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 70
+      },
+      {
+        "_id": "36M",
+        "tenor": 36,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 90
+      },
+      {
+        "_id": "48M",
+        "tenor": 48,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 110
+      }
+    ]
+  },
+  "paket": [],
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "FIXED",
+      "jenis": "NOMINAL",
+      "value": "25000"
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": "1"
+    },
+    {
+      "id": "CRC",
+      "name": "Biaya Credit Checking",
+      "type": "FIXED",
+      "jenis": "NOMINAL",
+      "value": "150000"
+    }
+  ],
+  "use_ltv": true,
+  "ltv_value": "70",
+  "flg": {
+    "used": true
+  },
+  "create_user": "trianaronatama@gmail.com",
+  "create_dtm": {
+    "$date": "2025-03-07T04:11:36.000Z"
+  },
+  "update_user": "saputera_eko",
+  "update_dtm": {
+    "$date": "2026-10-09T01:49:14.000Z"
+  },
+  "product_type": "SRTF"
+},
+{
+  "_id": "016",
+  "client_id": "001",
+  "product_name": "Kredit Cost Management Bersama 2",
+  "product_description": "<p>Biaya admin sesuai dengan plafonya</p>",
+  "term": "<h3>Syarat dan ketentuan produk cost management<h3>",
+  "certificates": [
+    {
+      "type": {
+        "id": "SHM",
+        "name": "SHM"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ],
+      "max_doc": "1",
+      "max_mandatory_doc": "1"
+    },
+    {
+      "type": {
+        "id": "SHGB",
+        "name": "SHGB"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ],
+      "max_doc": "1",
+      "max_mandatory_doc": "1"
+    }
+  ],
+  "interest_rate_type": "range",
+  "submission_loan": {
+    "min": 25000000,
+    "max": 500000000
+  },
+  "submission_tenors": {
+    "data": [
+      {
+        "min_id": "12M",
+        "max_id": "12M",
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        },
+        "interest_rate": 1.3
+      },
+      {
+        "min_id": "24M",
+        "max_id": "24M",
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        },
+        "interest_rate": 1.4
+      },
+      {
+        "min_id": "36M",
+        "max_id": "36M",
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        },
+        "interest_rate": 1.5
+      },
+      {
+        "min_id": "48M",
+        "max_id": "48M",
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        },
+        "interest_rate": 1.65
+      }
+    ],
+    "dtl": [
+      {
+        "_id": "12M",
+        "tenor": 12,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 50,
+        "interest_rate": 1.3,
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        }
+      },
+      {
+        "_id": "24M",
+        "tenor": 24,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 70,
+        "interest_rate": 1.4,
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        }
+      },
+      {
+        "_id": "36M",
+        "tenor": 36,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 90,
+        "interest_rate": 1.5,
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        }
+      },
+      {
+        "_id": "48M",
+        "tenor": 48,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 110,
+        "interest_rate": 1.65,
+        "submission_loan": {
+          "min": 25000000,
+          "max": 500000000
+        }
+      }
+    ]
+  },
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "RANGE",
+      "type_dtl": [
+        {
+          "tenor_id": "12M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 25000000,
+          "jenis": "NOMINAL",
+          "value": 500000
+        },
+        {
+          "tenor_id": "24M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 25000000,
+          "jenis": "NOMINAL",
+          "value": 500000
+        },
+        {
+          "tenor_id": "36M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 25000000,
+          "jenis": "NOMINAL",
+          "value": 500000
+        },
+        {
+          "tenor_id": "48M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 25000000,
+          "jenis": "NOMINAL",
+          "value": 500000
+        },
+        {
+          "tenor_id": "12M",
+          "tenor_name": "bulan",
+          "min_plafon": 25000001,
+          "max_plafon": 50000000,
+          "jenis": "NOMINAL",
+          "value": 750000
+        },
+        {
+          "tenor_id": "24M",
+          "tenor_name": "bulan",
+          "min_plafon": 25000001,
+          "max_plafon": 50000000,
+          "jenis": "NOMINAL",
+          "value": 750000
+        },
+        {
+          "tenor_id": "36M",
+          "tenor_name": "bulan",
+          "min_plafon": 25000001,
+          "max_plafon": 50000000,
+          "jenis": "NOMINAL",
+          "value": 750000
+        },
+        {
+          "tenor_id": "48M",
+          "tenor_name": "bulan",
+          "min_plafon": 25000001,
+          "max_plafon": 50000000,
+          "jenis": "NOMINAL",
+          "value": 750000
+        },
+        {
+          "tenor_id": "12M",
+          "tenor_name": "bulan",
+          "min_plafon": 500000001,
+          "max_plafon": 100000000,
+          "jenis": "NOMINAL",
+          "value": 1000000
+        },
+        {
+          "tenor_id": "24M",
+          "tenor_name": "bulan",
+          "min_plafon": 500000001,
+          "max_plafon": 100000000,
+          "jenis": "NOMINAL",
+          "value": 1000000
+        },
+        {
+          "tenor_id": "36M",
+          "tenor_name": "bulan",
+          "min_plafon": 500000001,
+          "max_plafon": 100000000,
+          "jenis": "NOMINAL",
+          "value": 1000000
+        },
+        {
+          "tenor_id": "48M",
+          "tenor_name": "bulan",
+          "min_plafon": 500000001,
+          "max_plafon": 100000000,
+          "jenis": "NOMINAL",
+          "value": 1000000
+        },
+        {
+          "tenor_id": "12M",
+          "tenor_name": "bulan",
+          "min_plafon": 100000001,
+          "max_plafon": 150000000,
+          "jenis": "NOMINAL",
+          "value": 1200000
+        },
+        {
+          "tenor_id": "24M",
+          "tenor_name": "bulan",
+          "min_plafon": 100000001,
+          "max_plafon": 150000000,
+          "jenis": "NOMINAL",
+          "value": 1200000
+        },
+        {
+          "tenor_id": "36M",
+          "tenor_name": "bulan",
+          "min_plafon": 100000001,
+          "max_plafon": 150000000,
+          "jenis": "NOMINAL",
+          "value": 1200000
+        },
+        {
+          "tenor_id": "48M",
+          "tenor_name": "bulan",
+          "min_plafon": 100000001,
+          "max_plafon": 150000000,
+          "jenis": "NOMINAL",
+          "value": 1200000
+        }
+      ]
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": "3"
+    },
+    {
+      "id": "SRV",
+      "name": "Biaya Survey",
+      "type": "RANGE",
+      "type_dtl": [
+        {
+          "tenor_id": "12M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 200000000,
+          "jenis": "NOMINAL",
+          "value": 50000
+        },
+        {
+          "tenor_id": "24M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 200000000,
+          "jenis": "NOMINAL",
+          "value": 50000
+        },
+        {
+          "tenor_id": "36M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 200000000,
+          "jenis": "NOMINAL",
+          "value": 50000
+        },
+        {
+          "tenor_id": "48M",
+          "tenor_name": "bulan",
+          "min_plafon": 0,
+          "max_plafon": 200000000,
+          "jenis": "NOMINAL",
+          "value": 50000
+        },
+        {
+          "tenor_id": "12M",
+          "tenor_name": "bulan",
+          "min_plafon": 200000001,
+          "max_plafon": 1000000000,
+          "jenis": "NOMINAL",
+          "value": 100000
+        },
+        {
+          "tenor_id": "24M",
+          "tenor_name": "bulan",
+          "min_plafon": 200000001,
+          "max_plafon": 1000000000,
+          "jenis": "NOMINAL",
+          "value": 100000
+        },
+        {
+          "tenor_id": "36M",
+          "tenor_name": "bulan",
+          "min_plafon": 200000001,
+          "max_plafon": 1000000000,
+          "jenis": "NOMINAL",
+          "value": 100000
+        },
+        {
+          "tenor_id": "48M",
+          "tenor_name": "bulan",
+          "min_plafon": 200000001,
+          "max_plafon": 1000000000,
+          "jenis": "NOMINAL",
+          "value": 100000
+        }
+      ]
+    }
+  ],
+  "flg": {
+    "used": false,
+    "deleted": false
+  },
+  "paket": [],
+  "ltv_value": 70,
+  "use_ltv": true,
+  "insurances": [],
+  "create_user": "super.admin3@test.com",
+  "create_dtm": {
+    "$date": "2026-07-02T08:37:28.000Z"
+  },
+  "update_user": "kc_bekasi2@gmail.com",
+  "update_dtm": {
+    "$date": "2026-09-29T03:19:19.000Z"
+  },
+  "max_tenor_ro": 3.5
+},
+{
+  "_id": "007",
+  "client_id": "001",
+  "product_name": "KSP (Sertifikat 25jt - 100j)",
+  "product_description": "<p><span style=\"color: rgb(136, 136, 136);\">Produk Paling Banyak di Pilih karena bersifat universal. Cicilan ringan dibandingkan dengan kompetitor lain*, dengan kepemilikan jaminan (anggunan) atas nama sendiri/ Pasangan / Anak / Orang tua.&nbsp;</span></p>",
+  "term": "<ol><li>Karyawan, Pengusaha Kecil/ Pengusaha Mikro / Pedagang</li><li>Calon Nasabah memiliki Anggunan Berupa Sertifikat rumah (SHM/SHGB)</li></ol><p><br></p>",
+  "certificates": [
+    {
+      "type": {
+        "id": "SHM",
+        "name": "SHM"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    },
+    {
+      "type": {
+        "id": "SHGB",
+        "name": "SHGB"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    }
+  ],
+  "interest_rate_type": "fixed",
+  "submission_loan": {
+    "min": 25000000,
+    "max": 100000000
+  },
+  "submission_tenors": {
+    "data": {
+      "id": [
+        "12M",
+        "18M",
+        "24M",
+        "30M",
+        "36M",
+        "48M"
+      ],
+      "interest_rate": 1.7
+    },
+    "dtl": [
+      {
+        "_id": "6M",
+        "tenor": 6,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 30
+      },
+      {
+        "_id": "12M",
+        "tenor": 12,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 50
+      },
+      {
+        "_id": "18M",
+        "tenor": 18,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 60
+      },
+      {
+        "_id": "24M",
+        "tenor": 24,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 70
+      },
+      {
+        "_id": "36M",
+        "tenor": 36,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 90
+      },
+      {
+        "_id": "48M",
+        "tenor": 48,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 110
+      }
+    ]
+  },
+  "paket": [],
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "FIXED",
+      "jenis": "NOMINAL",
+      "value": "1700000"
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": "4"
+    },
+    {
+      "id": "CRC",
+      "name": "Biaya Credit Checking",
+      "type": "FIXED",
+      "jenis": "NOMINAL",
+      "value": "100000"
+    }
+  ],
+  "use_ltv": true,
+  "ltv_value": "70",
+  "flg": {
+    "used": true
+  },
+  "create_user": "trianaronatama@gmail.com",
+  "create_dtm": {
+    "$date": "2025-05-11T04:15:36.000Z"
+  },
+  "update_user": "saputera_eko",
+  "update_dtm": {
+    "$date": "2026-11-01T13:34:57.000Z"
+  },
+  "product_type": "SRTF"
+},
+{
+  "_id": "008",
+  "client_id": "001",
+  "product_name": "KSP (Sertifikat >100jt - 200jt)",
+  "product_description": "<p><span style=\"color: rgb(136, 136, 136);\">Produk Paling Banyak di Pilih karena bersifat universal. Cicilan ringan dibandingkan dengan kompetitor lain*, dengan kepemilikan jaminan (anggunan) atas nama sendiri/ Pasangan / Anak / Orang tua.&nbsp;</span></p>",
+  "term": "<ol><li>Karyawan, Pengusaha Kecil/ Pengusaha Mikro / Pedagang</li><li>Calon Nasabah memiliki Anggunan Berupa Sertifikat rumah (SHM/SHGB)</li></ol><p><br></p>",
+  "certificates": [
+    {
+      "type": {
+        "id": "SHM",
+        "name": "SHM"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    },
+    {
+      "type": {
+        "id": "SHGB",
+        "name": "SHGB"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    }
+  ],
+  "interest_rate_type": "fixed",
+  "submission_loan": {
+    "min": 100000001,
+    "max": 200000000
+  },
+  "submission_tenors": {
+    "data": {
+      "id": [
+        "12M",
+        "18M",
+        "24M",
+        "30M",
+        "36M",
+        "48M"
+      ],
+      "interest_rate": 1.7
+    },
+    "dtl": [
+      {
+        "_id": "6M",
+        "tenor": 6,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 30
+      },
+      {
+        "_id": "12M",
+        "tenor": 12,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 50
+      },
+      {
+        "_id": "18M",
+        "tenor": 18,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 60
+      },
+      {
+        "_id": "24M",
+        "tenor": 24,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 70
+      },
+      {
+        "_id": "36M",
+        "tenor": 36,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 90
+      },
+      {
+        "_id": "48M",
+        "tenor": 48,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 110
+      }
+    ]
+  },
+  "paket": [],
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "FIXED",
+      "jenis": "NOMINAL",
+      "value": "2200000"
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": "4"
+    },
+    {
+      "id": "CRC",
+      "name": "Biaya Credit Checking",
+      "type": "FIXED",
+      "jenis": "NOMINAL",
+      "value": "300000"
+    }
+  ],
+  "use_ltv": true,
+  "ltv_value": "70",
+  "flg": {
+    "used": true
+  },
+  "create_user": "trianaronatama@gmail.com",
+  "create_dtm": {
+    "$date": "2025-05-11T04:15:36.000Z"
+  },
+  "update_user": "saputera_eko",
+  "update_dtm": {
+    "$date": "2026-10-14T07:30:41.000Z"
+  },
+  "product_type": "SRTF"
+},
+{
+  "_id": "009",
+  "client_id": "001",
+  "product_name": "KSP (Sertifikat >200jt)",
+  "product_description": "<p><span style=\"color: rgb(Sertifikat >200jt;\">Produk Paling Banyak di Pilih karena bersifat universal. Cicilan ringan dibandingkan dengan kompetitor lain*, dengan kepemilikan jaminan (anggunan) atas nama sendiri/ Pasangan / Anak / Orang tua.&nbsp;</span></p>",
+  "term": "<ol><li>Karyawan, Pengusaha Kecil/ Pengusaha Mikro / Pedagang</li><li>Calon Nasabah memiliki Anggunan Berupa Sertifikat rumah (SHM/SHGB)</li></ol><p><br></p>",
+  "certificates": [
+    {
+      "type": {
+        "id": "SHM",
+        "name": "SHM"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    },
+    {
+      "type": {
+        "id": "SHGB",
+        "name": "SHGB"
+      },
+      "owners": [
+        {
+          "id": "S0045",
+          "name": "Milik Sendiri"
+        },
+        {
+          "id": "S0046",
+          "name": "Orang Tua"
+        },
+        {
+          "id": "S0060",
+          "name": "Pasangan"
+        }
+      ]
+    }
+  ],
+  "interest_rate_type": "fixed",
+  "submission_loan": {
+    "min": 200000001,
+    "max": 2000000000
+  },
+  "submission_tenors": {
+    "data": {
+      "id": [
+        "12M",
+        "18M",
+        "24M",
+        "30M",
+        "36M",
+        "48M"
+      ],
+      "interest_rate": 1.7
+    },
+    "dtl": [
+      {
+        "_id": "6M",
+        "tenor": 6,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 30
+      },
+      {
+        "_id": "12M",
+        "tenor": 12,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 50
+      },
+      {
+        "_id": "18M",
+        "tenor": 18,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 60
+      },
+      {
+        "_id": "24M",
+        "tenor": 24,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 70
+      },
+      {
+        "_id": "36M",
+        "tenor": 36,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 90
+      },
+      {
+        "_id": "48M",
+        "tenor": 48,
+        "active": true,
+        "type": "BULAN",
+        "type_id": "BL",
+        "seq": 110
+      }
+    ]
+  },
+  "paket": [],
+  "tenor_type": "BULANAN",
+  "payment_type": {
+    "id": "INS",
+    "name": "Installment"
+  },
+  "cost_managaments": [
+    {
+      "id": "ADM",
+      "name": "Biaya Administrasi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": "1.1"
+    },
+    {
+      "id": "PRV",
+      "name": "Biaya Provisi",
+      "type": "FIXED",
+      "jenis": "PERCENTAGE",
+      "value": "4"
+    },
+    {
+      "id": "CRC",
+      "name": "Biaya Credit Checking",
+      "type": "FIXED",
+      "jenis": "NOMINAL",
+      "value": "350000"
+    }
+  ],
+  "use_ltv": true,
+  "ltv_value": "70",
+  "flg": {
+    "used": true
+  },
+  "create_user": "trianaronatama@gmail.com",
+  "create_dtm": {
+    "$date": "2025-05-11T04:15:36.000Z"
+  },
+  "update_user": "serly",
+  "update_dtm": {
+    "$date": "2026-10-30T14:35:48.000Z"
+  },
+  "product_type": "SRTF"
+}]
