@@ -137,9 +137,10 @@ export function resolveLoanProductDetail(lead: any): LoanProductDetail {
     const tenorType = srtfProduct?.tenor_type || 'BULANAN';
     const tenorTipe = `${safeTenor} ${tenorType}`;
 
+    const rawNominal = lead?.nominalPengajuan ?? lead?.nominal;
     const plafon =
-      lead?.nominalPengajuan && lead.nominalPengajuan > 10_000_000
-        ? lead.nominalPengajuan
+      rawNominal && rawNominal > 10_000_000
+        ? rawNominal
         : 50_000_000;
 
     const angsuran = lead?.angsuran || 4_741_667;
@@ -180,7 +181,7 @@ export function resolveLoanProductDetail(lead: any): LoanProductDetail {
   // Match paket by nominalPengajuan or lead's requested paket_id
   let matchedPaket: ClientProductPaket | undefined;
 
-  const targetPlafon = lead?.nominalPengajuan;
+  const targetPlafon = lead?.nominalPengajuan ?? lead?.nominal;
   if (lead?.pengajuan?.product?.paket_id) {
     matchedPaket = pakets.find((pk) => pk._id === lead.pengajuan.product.paket_id);
   }

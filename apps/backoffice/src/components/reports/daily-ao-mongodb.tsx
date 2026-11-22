@@ -38,6 +38,7 @@ import {
   ClipboardCheck,
 } from 'lucide-react';
 import { formatRupiah, formatDateTime } from '@/lib/formatters';
+import { DetailPinjamanDebitur } from '@/components/leads/detail-pinjaman-debitur';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1583,63 +1584,40 @@ export function DailyAoMongoReport() {
             </div>
 
             {/* Modal Scrollable Body */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs">
-              {/* Profile Card & Top Badges */}
-              <div className="p-4 rounded-xl border border-blue-100/80 bg-gradient-to-br from-blue-50/60 to-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs flex-1">
+              {/* Profile Card & Badges */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                    Nama Debitur/Nama Kelompok
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                    Nama Debitur / ID Leads
                   </span>
-                  <h4 className="text-lg font-extrabold text-slate-900 leading-tight">
+                  <h4 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
                     {selectedItem.debitur}
                   </h4>
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     <FlowStageBadge stage={selectedItem.flow_stage} />
 
-                    {selectedItem.application_type.type === 'REPEAT_ORDER' ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                        <Repeat className="w-3 h-3" />
-                        <span>{selectedItem.application_type.label}</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                        Pengajuan Baru (New)
-                      </span>
-                    )}
-
-                    <span
-                      className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold ${
-                        selectedItem.kategori === 'Produk UMI'
-                          ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                          : 'bg-purple-100 text-purple-800 border border-purple-200'
-                      }`}
-                    >
-                      {selectedItem.kategori}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200/60">
+                      {selectedItem.application_type.type === 'REPEAT_ORDER'
+                        ? `RO #${selectedItem.application_type.counter || 1}`
+                        : 'Pengajuan Baru'}
                     </span>
                   </div>
                 </div>
-
-                {selectedItem.nominal > 0 && (
-                  <div className="bg-white px-3.5 py-2.5 rounded-xl border border-blue-100 shadow-2xs sm:text-right shrink-0">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Nominal Pengajuan
-                    </span>
-                    <span className="text-base font-extrabold text-blue-700">
-                      {formatRupiah(selectedItem.nominal)}
-                    </span>
-                  </div>
-                )}
               </div>
 
+              {/* ── Card Detail Pinjaman Debitur (Berdasarkan Struktur client_product) ── */}
+              <DetailPinjamanDebitur lead={selectedItem} />
+
               {/* ── Visual Flow Pipeline / Stepper ── */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                    <ClipboardCheck className="w-4 h-4 text-blue-600" />
+              <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-100">
+                  <span className="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <ClipboardCheck className="w-4 h-4 text-slate-500" />
                     <span>Progress Alur Pengajuan Sistem</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-semibold">
-                    Tahap: <span className="font-bold text-slate-800">{selectedItem.flow_stage.name}</span>
+                  <span className="text-[11px] text-slate-500">
+                    Tahap: <span className="font-semibold text-slate-800">{selectedItem.flow_stage.name}</span>
                   </span>
                 </div>
 
@@ -1647,73 +1625,75 @@ export function DailyAoMongoReport() {
                   {getPipelineSteps(selectedItem).map((step, idx) => (
                     <div
                       key={idx}
-                      className={`p-2.5 rounded-xl border text-center flex flex-col justify-between transition ${
+                      className={`p-2.5 rounded-xl border text-center flex flex-col justify-between transition min-h-[72px] ${
                         step.status === 'passed'
-                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                          ? 'bg-emerald-50/50 border-emerald-200/80 text-emerald-950'
                           : step.status === 'active'
-                          ? 'bg-blue-50 border-blue-300 text-blue-900 shadow-2xs ring-1 ring-blue-200'
+                          ? 'bg-slate-50/90 border-slate-300 text-slate-900 ring-1 ring-slate-200'
                           : step.status === 'failed'
-                          ? 'bg-rose-50 border-rose-200 text-rose-900'
-                          : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60'
+                          ? 'bg-rose-50/40 border-rose-200 text-slate-800'
+                          : 'bg-slate-50/40 border-slate-200 text-slate-400 opacity-60'
                       }`}
                     >
                       <div className="flex items-center justify-center gap-1 mb-1">
                         {step.status === 'passed' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
-                        {step.status === 'active' && <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />}
-                        {step.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-rose-600" />}
-                        {step.status === 'upcoming' && <span className="w-2 h-2 rounded-full bg-slate-300" />}
-                        <span className="font-extrabold text-[11px]">{step.title}</span>
+                        {step.status === 'active' && <Clock className="w-3.5 h-3.5 text-slate-700" />}
+                        {step.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-rose-500" />}
+                        {step.status === 'upcoming' && <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />}
+                        <span
+                          className={`font-semibold text-[11px] leading-tight ${
+                            step.status === 'passed' ? 'text-emerald-900' : ''
+                          }`}
+                        >
+                          {step.title}
+                        </span>
                       </div>
-                      <span className="text-[10px] font-medium leading-tight">{step.desc}</span>
+                      <span
+                        className={`text-[10px] leading-tight ${
+                          step.status === 'passed' ? 'text-emerald-700/80 font-medium' : 'text-slate-500'
+                        }`}
+                      >
+                        {step.desc}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* ── Informasi SLA Pengajuan (Step Pengajuan → Complete) ── */}
+              {/* ── Informasi SLA Pengajuan ── */}
               {selectedItem.sla && (
-                <div className="p-4 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-blue-50/40 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
-                    <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-blue-600" />
-                      <span>SLA Pengajuan (Step Pengajuan → Pengajuan Status Complete)</span>
+                <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-3 shadow-2xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-slate-100">
+                    <span className="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-slate-500" />
+                      <span>SLA Pengajuan</span>
                     </span>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
-                        selectedItem.sla.status === 'COMPLETED'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 self-start sm:self-auto">
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          selectedItem.sla.status === 'COMPLETED'
+                            ? 'bg-emerald-500'
+                            : selectedItem.sla.status === 'RUNNING'
+                            ? 'bg-amber-500'
+                            : 'bg-rose-500'
+                        }`}
+                      />
+                      <span>
+                        {selectedItem.sla.status === 'COMPLETED'
+                          ? 'SLA Selesai'
                           : selectedItem.sla.status === 'RUNNING'
-                          ? 'bg-amber-50 text-amber-800 border-amber-300'
-                          : selectedItem.sla.status === 'CANCELLED'
-                          ? 'bg-rose-50 text-rose-800 border-rose-300'
-                          : 'bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {selectedItem.sla.status === 'COMPLETED' ? (
-                        <>
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>SLA Berhenti (Complete)</span>
-                        </>
-                      ) : selectedItem.sla.status === 'RUNNING' ? (
-                        <>
-                          <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
-                          <span>SLA Berjalan</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="w-3 h-3 text-rose-600" />
-                          <span>SLA Berhenti (Batal/Reject)</span>
-                        </>
-                      )}
+                          ? 'SLA Berjalan'
+                          : 'SLA Berhenti (Batal)'}
+                      </span>
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                    <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/70">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
                         Mulai Step Pengajuan
                       </span>
-                      <span className="text-xs font-extrabold text-slate-800 block mt-1">
+                      <span className="text-xs font-semibold text-slate-800 block mt-1">
                         {selectedItem.sla.start_time ? formatDateTime(selectedItem.sla.start_time) : '-'}
                       </span>
                       <span className="text-[10px] text-slate-400 block mt-0.5">
@@ -1721,11 +1701,11 @@ export function DailyAoMongoReport() {
                       </span>
                     </div>
 
-                    <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/70">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
                         Stop SLA (Status Complete)
                       </span>
-                      <span className="text-xs font-extrabold text-slate-800 block mt-1">
+                      <span className="text-xs font-semibold text-slate-800 block mt-1">
                         {selectedItem.sla.is_complete && selectedItem.sla.end_time
                           ? formatDateTime(selectedItem.sla.end_time)
                           : selectedItem.sla.status === 'RUNNING'
@@ -1743,11 +1723,11 @@ export function DailyAoMongoReport() {
                       </span>
                     </div>
 
-                    <div className="p-3 bg-white rounded-xl border border-blue-200 shadow-2xs bg-blue-50/30">
-                      <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+                    <div className="p-3 bg-slate-50/60 rounded-xl border border-slate-200/70">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
                         Total Durasi SLA
                       </span>
-                      <span className="text-sm font-extrabold text-blue-900 block mt-0.5">
+                      <span className="text-sm font-bold text-slate-900 block mt-0.5">
                         {selectedItem.sla.formatted_long || selectedItem.sla.formatted}
                       </span>
                       <span className="text-[10px] text-slate-500 block mt-0.5 leading-snug">
