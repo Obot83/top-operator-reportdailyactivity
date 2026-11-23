@@ -675,7 +675,6 @@ export function DaftarLeads() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof STATUS_FILTERS)[number]>('Semua');
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<string[]>([]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setPanelWidth] = useState<number>();
 
@@ -726,18 +725,6 @@ export function DaftarLeads() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  const pageIds = pageRows.map((lead) => lead.id);
-  const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
-
-  function toggleAll() {
-    setSelected((current) =>
-      allSelected ? current.filter((id) => !pageIds.includes(id)) : Array.from(new Set([...current, ...pageIds]))
-    );
-  }
-
-  function toggleOne(id: string) {
-    setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
-  }
 
   return (
     <main className="min-h-screen bg-[#f8fafc] px-4 py-6 sm:px-6 space-y-4">
@@ -791,19 +778,10 @@ export function DaftarLeads() {
       {/* ── Table Card (Clean Monochrome Borders, Clear Typography) ── */}
       <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-xs">
         <div ref={scrollerRef} className="overflow-x-auto">
-          <table className="w-full min-w-[1240px] text-xs text-left">
+          <table className="w-full min-w-[1200px] text-xs text-left">
             <thead className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="w-12 px-3.5 py-3 text-center">
-                  <input
-                    type="checkbox"
-                    aria-label="Pilih semua leads di halaman ini"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    className="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
-                  />
-                </th>
-                <th className="px-3 py-3 whitespace-nowrap">Last Update</th>
+                <th className="px-4 py-3 whitespace-nowrap">Last Update</th>
                 <th className="px-3 py-3 whitespace-nowrap">AO</th>
                 <th className="px-3 py-3 whitespace-nowrap">Nama Debitur / ID Leads</th>
                 <th className="px-3 py-3 whitespace-nowrap">NIK / No Handpone</th>
@@ -828,19 +806,8 @@ export function DaftarLeads() {
                     key={lead.id}
                     className="hover:bg-slate-50/70 transition-colors"
                   >
-                    {/* Checkbox */}
-                    <td className="px-3.5 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        aria-label={`Pilih ${lead.nama}`}
-                        checked={selected.includes(lead.id)}
-                        onChange={() => toggleOne(lead.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
-                      />
-                    </td>
-
                     {/* 1. Last Update */}
-                    <td className="px-3 py-3 whitespace-nowrap text-slate-600 text-xs">
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-600 text-xs">
                       {lead.lastUpdate}
                     </td>
 
